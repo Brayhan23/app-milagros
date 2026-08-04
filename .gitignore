@@ -39,6 +39,8 @@ build/Release
 
 # Dependency directories
 node_modules/
+.env
+*.db
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -141,3 +143,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# SQLite
+*.db
+/data/
