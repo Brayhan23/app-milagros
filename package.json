@@ -8,6 +8,7 @@
  "scripts": {
   "start": "node server.js",
   "crear-admin": "node scripts/crear-admin.js",
+  "verificar-backup": "node scripts/verificar-backup.js",
   "test": "echo \"Error: no test specified\" && exit 1"
 },
   
