@@ -55,3 +55,31 @@ CREATE TABLE IF NOT EXISTS productos (
   creado_en TEXT NOT NULL DEFAULT (datetime('now')),
   actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Épica 3 (HU-06, HU-08, HU-09, HU-10): Ventas y facturación
+--
+-- El descuento se guarda como monto fijo en pesos (no porcentaje), por la
+-- misma razón que los precios de productos: evitar redondeos de punto
+-- flotante en dinero.
+CREATE TABLE IF NOT EXISTS ventas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo_cliente TEXT NOT NULL CHECK (tipo_cliente IN ('detal', 'mayor')),
+  metodo_pago TEXT NOT NULL CHECK (metodo_pago IN ('efectivo', 'transferencia', 'credito')),
+  descuento INTEGER NOT NULL DEFAULT 0 CHECK (descuento >= 0),
+  subtotal INTEGER NOT NULL CHECK (subtotal >= 0),
+  total INTEGER NOT NULL CHECK (total >= 0),
+  creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- nombre_producto y precio_unitario quedan como "foto" del momento de la
+-- venta: si el producto cambia de nombre o precio después, la factura ya
+-- emitida no se altera.
+CREATE TABLE IF NOT EXISTS venta_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venta_id INTEGER NOT NULL REFERENCES ventas(id),
+  producto_id INTEGER NOT NULL REFERENCES productos(id),
+  nombre_producto TEXT NOT NULL,
+  cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+  precio_unitario INTEGER NOT NULL CHECK (precio_unitario >= 0),
+  subtotal INTEGER NOT NULL CHECK (subtotal >= 0)
+);
