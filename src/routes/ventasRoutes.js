@@ -1,5 +1,6 @@
 const express = require('express');
 const ventasService = require('../domain/ventasService');
+const emailService = require('../domain/emailService');
 
 const router = express.Router();
 
@@ -12,6 +13,9 @@ const ESTADO_POR_ERROR = {
   producto_no_encontrado: 404,
   stock_insuficiente: 409,
   no_encontrado: 404,
+  correo_invalido: 400,
+  smtp_no_configurado: 503,
+  envio_fallido: 502,
 };
 
 function responderError(res, resultado) {
@@ -44,6 +48,20 @@ router.get('/ventas/:id', (req, res) => {
   const resultado = ventasService.obtenerVenta(id);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json(resultado);
+});
+
+// HU-07: enviar copia de la factura ya generada por correo (sin timbrado DIAN).
+router.post('/ventas/:id/enviar-correo', async (req, res) => {
+  const id = parsearId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ exito: false, mensaje: 'El id de la venta debe ser un número entero.' });
+  }
+
+  const { correoDestino } = req.body || {};
+  const resultado = await emailService.enviarFacturaPorCorreo(id, correoDestino);
+  if (!resultado.exito) return responderError(res, resultado);
+
+  return res.json({ exito: true, mensaje: 'Factura enviada por correo correctamente.' });
 });
 
 module.exports = router;
