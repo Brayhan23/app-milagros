@@ -50,6 +50,7 @@ function verificarSesion() {
 function cargarPanel() {
   cargarStockTiempoReal();
   cargarAlertasStock();
+  cargarConfiguracion();
 }
 
 // --- PESTAÑAS (Productos / Facturas) ---
@@ -64,6 +65,10 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
     if (boton.dataset.tab === 'facturas') {
       cargarProductosParaVenta();
       cargarClientesParaVenta();
+    }
+
+    if (boton.dataset.tab === 'configuracion') {
+      cargarConfiguracion();
     }
 
     if (boton.dataset.tab === 'clientes') {
@@ -499,6 +504,8 @@ function mostrarFactura(venta) {
   mensajeCorreo.textContent = '';
   mensajeCorreo.className = 'mensaje';
 
+  aplicarEncabezadoEmpresa();
+
   document.getElementById('factura-id').textContent = venta.id;
   document.getElementById('factura-fecha').textContent = venta.creado_en;
   document.getElementById('factura-tipo-cliente').textContent = ETIQUETA_TIPO_CLIENTE[venta.tipo_cliente] || venta.tipo_cliente;
@@ -741,5 +748,91 @@ formAbono.addEventListener('submit', async (e) => {
   } catch (err) {
     mensajeAbono.textContent = 'Error de conexión al registrar el abono.';
     mensajeAbono.classList.add('error');
+  }
+});
+
+// --- HU-18: DATOS DE LA EMPRESA ---
+
+const formConfiguracion = document.getElementById('form-configuracion');
+const mensajeConfiguracion = document.getElementById('mensaje-configuracion');
+
+let configuracionActual = null;
+
+async function cargarConfiguracion() {
+  try {
+    const res = await fetch(`${API_URL}/configuracion`, { headers: obtenerHeaders() });
+    const data = await res.json();
+    configuracionActual = data.exito ? data.configuracion : null;
+
+    if (configuracionActual) {
+      document.getElementById('config-nombre').value = configuracionActual.nombre_empresa || '';
+      document.getElementById('config-nit').value = configuracionActual.nit || '';
+      document.getElementById('config-direccion').value = configuracionActual.direccion || '';
+      document.getElementById('config-telefono').value = configuracionActual.telefono || '';
+      document.getElementById('config-correo').value = configuracionActual.correo || '';
+      document.getElementById('config-logo').value = configuracionActual.logo_ruta || '';
+    }
+  } catch (err) {
+    configuracionActual = null;
+  }
+}
+
+// Usa lo cargado por cargarConfiguracion() para pintar el encabezado de la
+// factura impresa (logo, nombre, NIT/dirección/teléfono) en vez del texto
+// fijo "Milagros" que había antes.
+function aplicarEncabezadoEmpresa() {
+  const nombre = (configuracionActual && configuracionActual.nombre_empresa) || 'Milagros';
+  document.getElementById('factura-empresa-nombre').textContent = nombre;
+
+  const datos = [
+    configuracionActual && configuracionActual.nit ? `NIT ${configuracionActual.nit}` : null,
+    configuracionActual && configuracionActual.direccion,
+    configuracionActual && configuracionActual.telefono,
+  ].filter(Boolean);
+  document.getElementById('factura-empresa-datos').textContent = datos.join(' · ');
+
+  const logoImg = document.getElementById('factura-logo');
+  if (configuracionActual && configuracionActual.logo_ruta) {
+    logoImg.src = configuracionActual.logo_ruta;
+    logoImg.classList.remove('hidden');
+  } else {
+    logoImg.classList.add('hidden');
+  }
+}
+
+formConfiguracion.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensajeConfiguracion.textContent = '';
+  mensajeConfiguracion.className = 'mensaje';
+
+  const payload = {
+    nombreEmpresa: document.getElementById('config-nombre').value.trim(),
+    nit: document.getElementById('config-nit').value.trim() || null,
+    direccion: document.getElementById('config-direccion').value.trim() || null,
+    telefono: document.getElementById('config-telefono').value.trim() || null,
+    correo: document.getElementById('config-correo').value.trim() || null,
+    logoRuta: document.getElementById('config-logo').value.trim() || null,
+  };
+
+  try {
+    const res = await fetch(`${API_URL}/configuracion`, {
+      method: 'PUT',
+      headers: obtenerHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeConfiguracion.textContent = data.mensaje || 'No se pudo guardar la configuración.';
+      mensajeConfiguracion.classList.add('error');
+      return;
+    }
+
+    configuracionActual = data.configuracion;
+    mensajeConfiguracion.textContent = '✅ Configuración guardada.';
+    mensajeConfiguracion.classList.add('exito');
+  } catch (err) {
+    mensajeConfiguracion.textContent = 'Error de conexión al guardar la configuración.';
+    mensajeConfiguracion.classList.add('error');
   }
 });

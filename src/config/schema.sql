@@ -146,3 +146,48 @@ CREATE TABLE IF NOT EXISTS abonos (
   monto INTEGER NOT NULL CHECK (monto > 0),
   creado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- HU-18: Configuración de la empresa (para el encabezado de la factura y del correo)
+--
+-- Tabla de una sola fila, no clave-valor genérico: los campos que pide
+-- HU-18 son fijos y conocidos de antemano (nombre, NIT, dirección, teléfono,
+-- correo, logo), no un conjunto abierto que la usuaria vaya a definir en
+-- tiempo de ejecución. Un modelo clave-valor (clave TEXT, valor TEXT)
+-- sacrificaría tipos y CHECK por columna, y cada lectura tendría que pivotar
+-- N filas a un objeto en el código — sin ganar nada a cambio, porque acá se
+-- sabe de antemano cuáles son las columnas. El IVA de "requisitos
+-- adicionales" es una historia distinta con su propio tipo (un porcentaje
+-- numérico) y sus propias reglas: cuando llegue, le corresponde su propia
+-- tabla (mismo criterio que ya se usó para separar productos/ventas/
+-- clientes/abonos en vez de mezclarlos), no forzarlo en esta.
+--
+-- `id INTEGER PRIMARY KEY CHECK (id = 1)` garantiza que solo puede existir
+-- una fila (cualquier INSERT con otro id viola el CHECK; insertar id=1 de
+-- nuevo viola la PRIMARY KEY). El INSERT OR IGNORE de abajo siembra la fila
+-- por defecto la primera vez; en arranques siguientes no hace nada porque
+-- la fila con id=1 ya existe (haya sido tocada por la usuaria o no) — así
+-- la app nunca arranca con la tabla vacía.
+--
+-- logo_ruta guarda solo la RUTA/URL del archivo, nunca la imagen en base64
+-- dentro de la BD. Motivo: la BD se respalda completa una vez al día
+-- (backupService) y se conservan hasta 30 respaldos — un logo embebido se
+-- multiplicaría por cada backup diario (30 copias del mismo logo pesando lo
+-- mismo que la imagen), en un equipo de gama baja donde tanto el disco como
+-- la sincronización con Google Drive Desktop son recursos limitados. Con
+-- una ruta, cada backup diario solo carga con una cadena de texto de unos
+-- pocos bytes; el archivo de imagen en sí es responsabilidad de su propia
+-- carpeta (ver src/public/uploads/ y el comentario en configuracionService.js).
+CREATE TABLE IF NOT EXISTS configuracion_empresa (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  nombre_empresa TEXT NOT NULL DEFAULT 'Milagros',
+  -- Texto, no número: un NIT colombiano lleva guiones y dígito de
+  -- verificación (ej. "900123456-7"), no es una cantidad para operar.
+  nit TEXT,
+  direccion TEXT,
+  telefono TEXT,
+  correo TEXT,
+  logo_ruta TEXT,
+  actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO configuracion_empresa (id, nombre_empresa) VALUES (1, 'Milagros');

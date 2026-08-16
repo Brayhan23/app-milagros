@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const ventasService = require('./ventasService');
+const configuracionRepo = require('../data/configuracionRepo');
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,7 +18,21 @@ function validarCorreo(correo) {
 // Arma el HTML del correo a partir de una venta ya resuelta con sus items
 // (mismos datos que arma ventasService.obtenerVenta / ventasRepo.buscarPorId:
 // no se duplica ninguna consulta ni cálculo de totales).
+//
+// El logo (HU-18) NO se incrusta en el correo a propósito: esta app corre
+// local y no es accesible desde internet, así que un <img src="ruta local">
+// llegaría roto para quien lo reciba (los clientes de correo tampoco cargan
+// rutas de archivo por seguridad). Incrustarlo de verdad requeriría
+// adjuntarlo con Content-ID, que es una pieza más grande no pedida en esta
+// historia. El nombre/NIT/dirección/teléfono sí son texto plano y siempre
+// se ven bien en cualquier lector de correo, así que esos sí se usan aquí.
 function construirHtmlFactura(venta) {
+  const empresa = configuracionRepo.obtener() || {};
+  const nombreEmpresa = empresa.nombre_empresa || 'Milagros';
+  const lineaEmpresa = [empresa.nit ? `NIT ${empresa.nit}` : null, empresa.direccion, empresa.telefono]
+    .filter(Boolean)
+    .join(' · ');
+
   const filas = venta.items
     .map(
       (item) => `
@@ -32,7 +47,8 @@ function construirHtmlFactura(venta) {
 
   return `
     <div style="font-family: Arial, sans-serif; color:#2e2e2e; max-width:560px; margin:0 auto;">
-      <h2 style="color:#c2185b; margin-bottom:0;">Milagros</h2>
+      <h2 style="color:#c2185b; margin-bottom:0;">${nombreEmpresa}</h2>
+      ${lineaEmpresa ? `<p style="margin:2px 0; color:#767676; font-size:0.85em;">${lineaEmpresa}</p>` : ''}
       <p style="margin-top:2px; color:#767676;">Comprobante de venta</p>
       <p>Factura N.° <strong>${venta.id}</strong> — ${venta.creado_en}</p>
       <table style="width:100%; border-collapse:collapse; margin-top:12px;">
@@ -91,13 +107,14 @@ async function enviarFacturaPorCorreo(ventaId, correoDestino) {
   }
 
   const venta = resultadoVenta.venta;
+  const nombreEmpresa = (configuracionRepo.obtener() || {}).nombre_empresa || 'Milagros';
 
   try {
     const transportador = crearTransportador();
     await transportador.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: correoDestino.trim(),
-      subject: `Milagros — Factura N.° ${venta.id}`,
+      subject: `${nombreEmpresa} — Factura N.° ${venta.id}`,
       html: construirHtmlFactura(venta),
     });
     return { exito: true };
