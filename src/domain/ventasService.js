@@ -1,5 +1,6 @@
 const ventasRepo = require('../data/ventasRepo');
 const productosRepo = require('../data/productosRepo');
+const clientesRepo = require('../data/clientesRepo');
 
 const TIPOS_CLIENTE = ['detal', 'mayor'];
 const METODOS_PAGO = ['efectivo', 'transferencia', 'credito'];
@@ -36,6 +37,7 @@ function crearVenta(datos = {}) {
   const metodoPago = datos.metodoPago;
   const descuento = datos.descuento !== undefined ? aEntero(datos.descuento) : 0;
   const items = datos.items;
+  const clienteId = datos.clienteId !== undefined && datos.clienteId !== null ? aEntero(datos.clienteId) : null;
 
   if (!TIPOS_CLIENTE.includes(tipoCliente)) {
     return { exito: false, error: 'tipo_cliente_invalido', mensaje: 'El tipo de cliente debe ser "detal" o "mayor".' };
@@ -43,6 +45,21 @@ function crearVenta(datos = {}) {
 
   if (!METODOS_PAGO.includes(metodoPago)) {
     return { exito: false, error: 'metodo_pago_invalido', mensaje: 'El método de pago debe ser efectivo, transferencia o crédito.' };
+  }
+
+  // HU-12, regla crítica: sin cliente no hay a quién cobrarle la deuda.
+  if (metodoPago === 'credito' && clienteId === null) {
+    return { exito: false, error: 'cliente_requerido', mensaje: 'Las ventas a crédito deben indicar un cliente.' };
+  }
+
+  if (clienteId !== null) {
+    if (!Number.isInteger(clienteId)) {
+      return { exito: false, error: 'cliente_no_encontrado', mensaje: 'El id del cliente no es válido.' };
+    }
+    const cliente = clientesRepo.buscarPorId(clienteId);
+    if (!cliente || !cliente.activo) {
+      return { exito: false, error: 'cliente_no_encontrado', mensaje: 'No se encontró el cliente indicado.' };
+    }
   }
 
   const validacionItems = validarItems(items);
@@ -101,6 +118,7 @@ function crearVenta(datos = {}) {
   const venta = ventasRepo.crear({
     tipoCliente,
     metodoPago,
+    clienteId,
     descuento,
     subtotal,
     total,
