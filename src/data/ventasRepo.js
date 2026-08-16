@@ -16,13 +16,19 @@ function listar() {
   return ventas.map((venta) => ({ ...venta, items: obtenerItemsPorVenta(venta.id) }));
 }
 
-const crear = db.transaction(({ tipoCliente, metodoPago, descuento, subtotal, total, items }) => {
+// cliente_id viaja en el mismo INSERT que el resto de la venta: al no
+// existir una tabla "deudas" aparte (ver schema.sql), una venta a crédito
+// CON su cliente_id ya ES la deuda registrada, así que queda creada en la
+// misma transacción que la venta y el descuento de stock sin necesidad de
+// un segundo INSERT — no hay forma de que quede una venta sin su deuda ni
+// al revés porque son la misma fila.
+const crear = db.transaction(({ tipoCliente, metodoPago, clienteId, descuento, subtotal, total, items }) => {
   const infoVenta = db
     .prepare(
-      `INSERT INTO ventas (tipo_cliente, metodo_pago, descuento, subtotal, total)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO ventas (tipo_cliente, metodo_pago, cliente_id, descuento, subtotal, total)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(tipoCliente, metodoPago, descuento, subtotal, total);
+    .run(tipoCliente, metodoPago, clienteId, descuento, subtotal, total);
 
   const ventaId = infoVenta.lastInsertRowid;
 

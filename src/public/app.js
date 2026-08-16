@@ -63,6 +63,11 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
 
     if (boton.dataset.tab === 'facturas') {
       cargarProductosParaVenta();
+      cargarClientesParaVenta();
+    }
+
+    if (boton.dataset.tab === 'clientes') {
+      cargarDeudores();
     }
   });
 });
@@ -284,7 +289,12 @@ const inputFacturaCorreo = document.getElementById('factura-correo');
 const btnEnviarCorreo = document.getElementById('btn-enviar-correo');
 const mensajeCorreo = document.getElementById('mensaje-correo');
 
+// HU-12: cliente obligatorio cuando la venta es a crédito
+const grupoVentaCliente = document.getElementById('venta-cliente-grupo');
+const selectVentaCliente = document.getElementById('venta-cliente');
+
 let productosDisponibles = [];
+let clientesDisponibles = [];
 let carrito = [];
 let ventaActualId = null;
 
@@ -302,6 +312,26 @@ async function cargarProductosParaVenta() {
     selectVentaProducto.innerHTML = '<option value="">Error al cargar productos</option>';
   }
 }
+
+async function cargarClientesParaVenta() {
+  try {
+    const res = await fetch(`${API_URL}/clientes`, { headers: obtenerHeaders() });
+    const data = await res.json();
+    clientesDisponibles = data.exito ? data.clientes : [];
+
+    selectVentaCliente.innerHTML = clientesDisponibles
+      .map((c) => `<option value="${c.id}">${c.nombre}${c.documento ? ' (' + c.documento + ')' : ''}</option>`)
+      .join('') || '<option value="">No hay clientes registrados</option>';
+  } catch (err) {
+    selectVentaCliente.innerHTML = '<option value="">Error al cargar clientes</option>';
+  }
+}
+
+function actualizarVisibilidadCliente() {
+  const esCredito = selectMetodoPago.value === 'credito';
+  grupoVentaCliente.classList.toggle('hidden', !esCredito);
+}
+selectMetodoPago.addEventListener('change', actualizarVisibilidadCliente);
 
 function precioUnitarioActual(producto) {
   return selectTipoCliente.value === 'mayor' ? producto.precio_mayor : producto.precio_detal;
@@ -416,6 +446,15 @@ btnGenerarFactura.addEventListener('click', async () => {
     return;
   }
 
+  const esCredito = selectMetodoPago.value === 'credito';
+  const clienteId = selectVentaCliente.value ? Number(selectVentaCliente.value) : null;
+
+  if (esCredito && !clienteId) {
+    mensajeVenta.textContent = 'Las ventas a crédito deben indicar un cliente.';
+    mensajeVenta.className = 'mensaje error';
+    return;
+  }
+
   try {
     const res = await fetch(`${API_URL}/ventas`, {
       method: 'POST',
@@ -423,6 +462,7 @@ btnGenerarFactura.addEventListener('click', async () => {
       body: JSON.stringify({
         tipoCliente: selectTipoCliente.value,
         metodoPago: selectMetodoPago.value,
+        clienteId,
         descuento: Number(inputDescuento.value) || 0,
         items: carrito.map((item) => ({ productoId: item.productoId, cantidad: item.cantidad })),
       }),
@@ -438,6 +478,8 @@ btnGenerarFactura.addEventListener('click', async () => {
     mostrarFactura(data.venta);
     carrito = [];
     inputDescuento.value = 0;
+    selectMetodoPago.value = 'efectivo';
+    actualizarVisibilidadCliente();
     renderizarCarrito();
     cargarProductosParaVenta();
     cargarStockTiempoReal();
@@ -533,5 +575,171 @@ btnEnviarCorreo.addEventListener('click', async () => {
   } finally {
     btnEnviarCorreo.disabled = false;
     btnEnviarCorreo.textContent = 'Enviar por Correo';
+  }
+});
+
+// --- HU-11, HU-12, HU-13: CLIENTES Y CRÉDITOS ---
+
+const formCliente = document.getElementById('form-cliente');
+const mensajeCliente = document.getElementById('mensaje-cliente');
+const tablaBodyDeudores = document.getElementById('tabla-body-deudores');
+const btnCargarDeudores = document.getElementById('btn-cargar-deudores');
+const inputDeudaClienteId = document.getElementById('deuda-cliente-id');
+const btnVerDeuda = document.getElementById('btn-ver-deuda');
+const detalleDeuda = document.getElementById('detalle-deuda');
+const formAbono = document.getElementById('form-abono');
+const mensajeAbono = document.getElementById('mensaje-abono');
+
+// HU-11: registrar cliente
+formCliente.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensajeCliente.textContent = '';
+  mensajeCliente.className = 'mensaje';
+
+  const payload = {
+    nombre: document.getElementById('cliente-nombre').value.trim(),
+    documento: document.getElementById('cliente-documento').value.trim() || null,
+    telefono: document.getElementById('cliente-telefono').value.trim() || null,
+    correo: document.getElementById('cliente-correo').value.trim() || null,
+    esMayorista: document.getElementById('cliente-mayorista').checked,
+  };
+
+  try {
+    const res = await fetch(`${API_URL}/clientes`, {
+      method: 'POST',
+      headers: obtenerHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeCliente.textContent = data.mensaje || 'Error al registrar el cliente.';
+      mensajeCliente.classList.add('error');
+      return;
+    }
+
+    mensajeCliente.textContent = `✅ Cliente "${data.cliente.nombre}" registrado (ID: ${data.cliente.id}).`;
+    mensajeCliente.classList.add('exito');
+    formCliente.reset();
+    cargarClientesParaVenta();
+  } catch (err) {
+    mensajeCliente.textContent = 'Error de conexión al guardar el cliente.';
+    mensajeCliente.classList.add('error');
+  }
+});
+
+// HU-13: clientes con deuda pendiente
+btnCargarDeudores.addEventListener('click', cargarDeudores);
+
+async function cargarDeudores() {
+  try {
+    const res = await fetch(`${API_URL}/clientes/deudas`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!data.exito || !data.clientes || data.clientes.length === 0) {
+      tablaBodyDeudores.innerHTML = `<tr><td colspan="4" class="empty-state">No hay clientes con deuda pendiente.</td></tr>`;
+      return;
+    }
+
+    tablaBodyDeudores.innerHTML = data.clientes
+      .map(
+        (c) => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${c.nombre}</td>
+          <td>${c.documento || '—'}</td>
+          <td>$${c.saldo_total.toLocaleString()}</td>
+        </tr>
+      `
+      )
+      .join('');
+  } catch (err) {
+    tablaBodyDeudores.innerHTML = `<tr><td colspan="4" class="empty-state">Error al cargar los deudores.</td></tr>`;
+  }
+}
+
+// HU-12: detalle de deuda de un cliente (ventas a crédito + abonos)
+btnVerDeuda.addEventListener('click', async () => {
+  const clienteId = inputDeudaClienteId.value;
+  if (!clienteId) {
+    detalleDeuda.innerHTML = '<p class="empty-state">Escribí el ID de un cliente.</p>';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/clientes/${clienteId}/deuda`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      detalleDeuda.innerHTML = `<p class="empty-state">${data.mensaje || 'No se pudo consultar la deuda.'}</p>`;
+      return;
+    }
+
+    const filasVentas = data.ventas.length
+      ? data.ventas
+          .map(
+            (v) => `
+          <tr>
+            <td>${v.venta_id}</td>
+            <td>${v.creado_en}</td>
+            <td>$${v.total.toLocaleString()}</td>
+            <td>$${v.abonado.toLocaleString()}</td>
+            <td>$${v.saldo.toLocaleString()}</td>
+          </tr>
+        `
+          )
+          .join('')
+      : '<tr><td colspan="5" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
+
+    const filasAbonos = data.abonos.length
+      ? data.abonos.map((a) => `<li>Venta #${a.venta_id}: $${a.monto.toLocaleString()} (${a.creado_en})</li>`).join('')
+      : '<li class="empty-state">Sin abonos registrados.</li>';
+
+    detalleDeuda.innerHTML = `
+      <p><strong>${data.cliente.nombre}</strong> — Saldo total pendiente: <strong>$${data.saldoTotal.toLocaleString()}</strong></p>
+      <table class="tabla-inventario">
+        <thead>
+          <tr><th>Venta</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th></tr>
+        </thead>
+        <tbody>${filasVentas}</tbody>
+      </table>
+      <p><strong>Abonos:</strong></p>
+      <ul>${filasAbonos}</ul>
+    `;
+  } catch (err) {
+    detalleDeuda.innerHTML = '<p class="empty-state">Error de conexión al consultar la deuda.</p>';
+  }
+});
+
+// HU-12: registrar abono
+formAbono.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensajeAbono.textContent = '';
+  mensajeAbono.className = 'mensaje';
+
+  const ventaId = document.getElementById('abono-venta-id').value;
+  const monto = Number(document.getElementById('abono-monto').value);
+
+  try {
+    const res = await fetch(`${API_URL}/ventas/${ventaId}/abonos`, {
+      method: 'POST',
+      headers: obtenerHeaders(),
+      body: JSON.stringify({ monto }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeAbono.textContent = data.mensaje || 'No se pudo registrar el abono.';
+      mensajeAbono.classList.add('error');
+      return;
+    }
+
+    mensajeAbono.textContent = `✅ Abono registrado. Saldo restante de la venta #${ventaId}: $${data.saldoRestante.toLocaleString()}.`;
+    mensajeAbono.classList.add('exito');
+    formAbono.reset();
+    cargarDeudores();
+  } catch (err) {
+    mensajeAbono.textContent = 'Error de conexión al registrar el abono.';
+    mensajeAbono.classList.add('error');
   }
 });

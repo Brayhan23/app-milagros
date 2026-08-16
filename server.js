@@ -6,6 +6,7 @@ const backupRoutes = require('./src/routes/backupRoutes');
 const backupService = require('./src/domain/backupService');
 const productosRoutes = require('./src/routes/productosRoutes');
 const ventasRoutes = require('./src/routes/ventasRoutes');
+const clientesRoutes = require('./src/routes/clientesRoutes');
 const requiereSesion = require('./src/routes/middlewares/requiereSesion');
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.static(path.join(__dirname, 'src', 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api', requiereSesion, productosRoutes);
 app.use('/api', requiereSesion, ventasRoutes);
+app.use('/api', requiereSesion, clientesRoutes);
 app.use('/api', requiereSesion, backupRoutes);
 
 const PORT = process.env.PORT || 3000;

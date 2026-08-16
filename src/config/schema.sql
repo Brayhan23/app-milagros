@@ -65,6 +65,15 @@ CREATE TABLE IF NOT EXISTS ventas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tipo_cliente TEXT NOT NULL CHECK (tipo_cliente IN ('detal', 'mayor')),
   metodo_pago TEXT NOT NULL CHECK (metodo_pago IN ('efectivo', 'transferencia', 'credito')),
+  -- Nullable: una venta al mostrador no siempre tiene cliente identificado.
+  -- Obligatorio cuando metodo_pago = 'credito' (HU-12), pero esa regla NO se
+  -- expresa como CHECK aquí: es una condición entre dos columnas que además
+  -- rompería cualquier BD existente con ventas a crédito de prueba ya
+  -- guardadas sin cliente_id. Se valida en ventasService antes de insertar.
+  -- Ver src/data/db.js para cómo se agrega esta columna a una BD que ya
+  -- tenía la tabla ventas creada (CREATE TABLE IF NOT EXISTS no puede
+  -- agregar columnas a una tabla existente).
+  cliente_id INTEGER REFERENCES clientes(id),
   descuento INTEGER NOT NULL DEFAULT 0 CHECK (descuento >= 0),
   subtotal INTEGER NOT NULL CHECK (subtotal >= 0),
   total INTEGER NOT NULL CHECK (total >= 0),
@@ -82,4 +91,58 @@ CREATE TABLE IF NOT EXISTS venta_items (
   cantidad INTEGER NOT NULL CHECK (cantidad > 0),
   precio_unitario INTEGER NOT NULL CHECK (precio_unitario >= 0),
   subtotal INTEGER NOT NULL CHECK (subtotal >= 0)
+);
+
+-- Épica 4 (HU-11, HU-12, HU-13): Clientes, ventas a crédito y deudas
+--
+-- Modelo de deudas: una venta a crédito ES la deuda; no existe una tabla
+-- "deudas" aparte. Motivo: HU-12 dice "una venta a crédito genera una
+-- deuda" — la relación es 1 a 1 por definición (no hay deudas que no vengan
+-- de una venta a crédito), así que una tabla "deudas" solo terminaría
+-- duplicando venta_id sin agregar información real, y complicaría la
+-- transacción de HU-12 punto 5 (habría que insertar en dos tablas en vez de
+-- una). El saldo pendiente de una venta a crédito se calcula siempre como
+-- `ventas.total - SUM(abonos.monto)` en el momento de la consulta — nunca
+-- se guarda un saldo "cacheado" en una columna. Así es imposible que el
+-- saldo mostrado se desincronice de la suma real de abonos (el bug clásico
+-- de mantener un total denormalizado al día); con el volumen de ventas de
+-- una tienda local esa suma en cada consulta es un costo trivial.
+CREATE TABLE IF NOT EXISTS clientes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+
+  -- Único cuando existe, pero opcional: mismo criterio ya usado en
+  -- productos.codigo_barras (UNIQUE en SQLite permite múltiples NULL, así
+  -- que varios clientes sin documento registrado conviven sin chocar).
+  documento TEXT UNIQUE,
+
+  telefono TEXT,
+  correo TEXT,
+
+  -- Distingue clientes mayoristas (HU-11) de clientes ocasionales.
+  es_mayorista INTEGER NOT NULL DEFAULT 0 CHECK (es_mayorista IN (0, 1)),
+
+  -- "Eliminar" desactiva, no borra: mismo criterio que productos.activo —
+  -- un cliente desactivado puede tener ventas/deudas históricas que no
+  -- deben perderse.
+  activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+
+  creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+  actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Un abono es un pago parcial contra UNA venta a crédito puntual, no contra
+-- un "saldo general" del cliente: el sistema no reparte automáticamente un
+-- pago entre varias ventas pendientes, la usuaria elige a cuál venta aplica
+-- cada abono. Es más simple (sin lógica de reparto/orden de pago) y da
+-- trazabilidad exacta ("este pago fue por esta compra"), coherente con que
+-- cada venta a crédito ya es su propia deuda.
+CREATE TABLE IF NOT EXISTS abonos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venta_id INTEGER NOT NULL REFERENCES ventas(id),
+  -- Que la venta referenciada tenga metodo_pago = 'credito' es una regla
+  -- entre tablas (no expresable como CHECK de SQLite); se valida en
+  -- creditoService antes de insertar.
+  monto INTEGER NOT NULL CHECK (monto > 0),
+  creado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );

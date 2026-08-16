@@ -47,6 +47,7 @@
       <nav class="tabs">
         <button type="button" class="tab-btn active" data-tab="productos">🏷️ Productos</button>
         <button type="button" class="tab-btn" data-tab="facturas">🧾 Facturas</button>
+        <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
       </nav>
 
       <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
@@ -217,6 +218,12 @@
             </div>
           </div>
 
+          <!-- HU-12: obligatorio solo cuando el método de pago es crédito -->
+          <div class="form-group hidden" id="venta-cliente-grupo">
+            <label for="venta-cliente">Cliente (obligatorio para venta a crédito)</label>
+            <select id="venta-cliente"></select>
+          </div>
+
           <div class="resumen-totales">
             <p>Subtotal: <strong id="venta-subtotal">$0</strong></p>
             <p>Descuento: <strong id="venta-descuento-resumen">$0</strong></p>
@@ -278,6 +285,102 @@
             </div>
             <div id="mensaje-correo" class="mensaje"></div>
           </div>
+        </section>
+
+      </div>
+
+      <!-- Pestaña: Clientes y créditos (HU-11, HU-12, HU-13) -->
+      <div id="tab-clientes" class="tab-panel hidden">
+
+        <!-- HU-11: Registrar cliente -->
+        <section class="card">
+          <h2>👤 Registrar Cliente (HU-11)</h2>
+          <form id="form-cliente" class="form-grid-2col">
+            <div class="form-group">
+              <label for="cliente-nombre">Nombre *</label>
+              <input type="text" id="cliente-nombre" placeholder="Ej: Juan Pérez" required>
+            </div>
+            <div class="form-group">
+              <label for="cliente-documento">Documento</label>
+              <input type="text" id="cliente-documento" placeholder="Ej: 123456789">
+            </div>
+            <div class="form-group">
+              <label for="cliente-telefono">Teléfono</label>
+              <input type="text" id="cliente-telefono" placeholder="Ej: 3001234567">
+            </div>
+            <div class="form-group">
+              <label for="cliente-correo">Correo</label>
+              <input type="email" id="cliente-correo" placeholder="cliente@correo.com">
+            </div>
+            <div class="form-group">
+              <label for="cliente-mayorista">
+                <input type="checkbox" id="cliente-mayorista"> Es cliente mayorista
+              </label>
+            </div>
+            <div class="form-actions span-2">
+              <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+            </div>
+          </form>
+          <div id="mensaje-cliente" class="mensaje"></div>
+        </section>
+
+        <!-- HU-13: Clientes con deuda pendiente -->
+        <section class="card">
+          <div class="card-header">
+            <h2>💰 Clientes con Deuda Pendiente (HU-13)</h2>
+            <button id="btn-cargar-deudores" class="btn btn-secondary">Actualizar Lista</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Cliente</th>
+                  <th>Documento</th>
+                  <th>Saldo Pendiente</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-deudores">
+                <tr>
+                  <td colspan="4" class="empty-state">Cargando deudores...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- HU-12: Detalle de deuda de un cliente -->
+        <section class="card">
+          <h2>📄 Detalle de Deuda de un Cliente</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="deuda-cliente-id">ID del Cliente</label>
+              <input type="number" id="deuda-cliente-id" placeholder="Ej: 1">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-ver-deuda" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="detalle-deuda"></div>
+        </section>
+
+        <!-- HU-12: Registrar abono -->
+        <section class="card">
+          <h2>💵 Registrar Abono</h2>
+          <form id="form-abono" class="form-grid-3col">
+            <div class="form-group">
+              <label for="abono-venta-id">ID de la Venta (a crédito)</label>
+              <input type="number" id="abono-venta-id" placeholder="Ej: 3" required>
+            </div>
+            <div class="form-group">
+              <label for="abono-monto">Monto del Abono ($)</label>
+              <input type="number" id="abono-monto" min="1" placeholder="Ej: 20000" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Registrar Abono</button>
+            </div>
+          </form>
+          <div id="mensaje-abono" class="mensaje"></div>
         </section>
 
       </div>

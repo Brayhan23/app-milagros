@@ -25,4 +25,23 @@ if (!dbExistia) {
   console.log(`Base de datos creada en ${dbPath} a partir de schema.sql`);
 }
 
+// Migraciones puntuales: CREATE TABLE IF NOT EXISTS no puede agregar una
+// columna a una tabla que ya existe, así que una BD creada antes de HU-11
+// (con la tabla `ventas` ya presente pero sin `cliente_id`) se queda atrás.
+// Se corrige con un ALTER TABLE explícito, protegido por PRAGMA table_info
+// para que sea idempotente y no falle en arranques posteriores ni en una BD
+// nueva (donde schema.sql ya crea la columna y aquí no hay nada que hacer).
+// Probado contra una copia real de la BD de este proyecto antes de aplicarlo.
+function columnaExiste(tabla, columna) {
+  return db
+    .prepare(`PRAGMA table_info(${tabla})`)
+    .all()
+    .some((columnaInfo) => columnaInfo.name === columna);
+}
+
+if (!columnaExiste('ventas', 'cliente_id')) {
+  db.exec('ALTER TABLE ventas ADD COLUMN cliente_id INTEGER REFERENCES clientes(id)');
+  console.log('Migración aplicada: ventas.cliente_id agregada (HU-11/HU-12/HU-13).');
+}
+
 module.exports = db;
