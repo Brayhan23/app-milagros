@@ -91,12 +91,8 @@ formLogin.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Guarda token o identificador de sesión
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-    } else {
-      localStorage.setItem('token', 'sesion_activa_general');
-    }
+    // El backend emite un token real (UUID) al autenticar; sin él no hay sesión.
+    localStorage.setItem('token', data.token);
 
     formLogin.reset();
     verificarSesion();
@@ -283,8 +279,14 @@ const facturaGenerada = document.getElementById('factura-generada');
 const btnImprimirFactura = document.getElementById('btn-imprimir-factura');
 const btnNuevaVenta = document.getElementById('btn-nueva-venta');
 
+// HU-07: envío de factura por correo
+const inputFacturaCorreo = document.getElementById('factura-correo');
+const btnEnviarCorreo = document.getElementById('btn-enviar-correo');
+const mensajeCorreo = document.getElementById('mensaje-correo');
+
 let productosDisponibles = [];
 let carrito = [];
+let ventaActualId = null;
 
 async function cargarProductosParaVenta() {
   try {
@@ -450,6 +452,11 @@ const ETIQUETA_TIPO_CLIENTE = { detal: 'Detal', mayor: 'Mayor' };
 const ETIQUETA_METODO_PAGO = { efectivo: 'Efectivo', transferencia: 'Transferencia', credito: 'Crédito' };
 
 function mostrarFactura(venta) {
+  ventaActualId = venta.id;
+  inputFacturaCorreo.value = '';
+  mensajeCorreo.textContent = '';
+  mensajeCorreo.className = 'mensaje';
+
   document.getElementById('factura-id').textContent = venta.id;
   document.getElementById('factura-fecha').textContent = venta.creado_en;
   document.getElementById('factura-tipo-cliente').textContent = ETIQUETA_TIPO_CLIENTE[venta.tipo_cliente] || venta.tipo_cliente;
@@ -480,4 +487,51 @@ btnImprimirFactura.addEventListener('click', () => window.print());
 btnNuevaVenta.addEventListener('click', () => {
   facturaGenerada.classList.add('hidden');
   seccionVenta.classList.remove('hidden');
+  ventaActualId = null;
+});
+
+// --- HU-07: ENVIAR FACTURA POR CORREO ---
+btnEnviarCorreo.addEventListener('click', async () => {
+  mensajeCorreo.textContent = '';
+  mensajeCorreo.className = 'mensaje';
+
+  const correoDestino = inputFacturaCorreo.value.trim();
+  if (!correoDestino) {
+    mensajeCorreo.textContent = 'Escribí el correo del cliente.';
+    mensajeCorreo.className = 'mensaje error';
+    return;
+  }
+
+  if (!ventaActualId) {
+    mensajeCorreo.textContent = 'No hay una factura generada para enviar.';
+    mensajeCorreo.className = 'mensaje error';
+    return;
+  }
+
+  btnEnviarCorreo.disabled = true;
+  btnEnviarCorreo.textContent = 'Enviando...';
+
+  try {
+    const res = await fetch(`${API_URL}/ventas/${ventaActualId}/enviar-correo`, {
+      method: 'POST',
+      headers: obtenerHeaders(),
+      body: JSON.stringify({ correoDestino }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeCorreo.textContent = data.mensaje || 'No se pudo enviar el correo.';
+      mensajeCorreo.className = 'mensaje error';
+      return;
+    }
+
+    mensajeCorreo.textContent = `✅ ${data.mensaje || 'Factura enviada por correo.'}`;
+    mensajeCorreo.className = 'mensaje exito';
+  } catch (err) {
+    mensajeCorreo.textContent = 'Error de conexión al enviar el correo.';
+    mensajeCorreo.className = 'mensaje error';
+  } finally {
+    btnEnviarCorreo.disabled = false;
+    btnEnviarCorreo.textContent = 'Enviar por Correo';
+  }
 });

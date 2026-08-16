@@ -160,6 +160,12 @@ body {
 .resumen-totales .total-final { font-size: 1.1rem; }
 .resumen-totales .total-final strong { color: var(--rosado-oscuro); }
 
+.factura-email {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borde);
+}
+
 .factura-header {
   display: flex;
   justify-content: space-between;
