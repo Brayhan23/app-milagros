@@ -91,12 +91,8 @@ formLogin.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Guarda token o identificador de sesión
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-    } else {
-      localStorage.setItem('token', 'sesion_activa_general');
-    }
+    // El backend emite un token real (UUID) al autenticar; sin él no hay sesión.
+    localStorage.setItem('token', data.token);
 
     formLogin.reset();
     verificarSesion();

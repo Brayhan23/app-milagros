@@ -1,5 +1,6 @@
 const express = require('express');
 const authService = require('../domain/authService');
+const sesionService = require('../domain/sesionService');
 
 const router = express.Router();
 
@@ -17,7 +18,9 @@ router.post('/login', (req, res) => {
     return res.status(status).json({ exito: false, mensaje: resultado.mensaje });
   }
 
-  return res.json({ exito: true, usuario: resultado.usuario });
+  const token = sesionService.crearSesion(resultado.usuario);
+
+  return res.json({ exito: true, usuario: resultado.usuario, token });
 });
 
 module.exports = router;
