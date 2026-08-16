@@ -1,0 +1,236 @@
+/* Paleta y base */
+:root {
+  --rosado-oscuro: #c2185b;
+  --rosado-medio: #f8bbd0;
+  --rosado-claro: #fce4ec;
+  --texto: #2e2e2e;
+  --texto-suave: #767676;
+  --borde: #e3e3e3;
+  --fondo: #fdf7f8;
+  --blanco: #ffffff;
+  --exito: #2e7d32;
+  --exito-fondo: #e8f5e9;
+  --error: #c62828;
+  --error-fondo: #fdecea;
+  --alerta: #ef6c00;
+  --alerta-fondo: #fff3e0;
+  --sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+/* Encabezado del panel */
+.header {
+  background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+  padding: 16px 20px;
+}
+.header h1 { margin: 0; font-size: 1.3rem; color: var(--rosado-oscuro); }
+.subtitle { margin: 2px 0 0; font-size: 0.85rem; color: var(--texto-suave); }
+
+/* Tarjetas */
+.card {
+  background: var(--blanco);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  box-shadow: var(--sombra);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card h2 { margin-top: 0; font-size: 1.05rem; color: var(--rosado-oscuro); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.card-header h2 { margin: 0; }
+.alert-card { border-left: 4px solid var(--alerta); }
+
+/* Formularios */
+.form-group { display: flex; flex-direction: column; margin-bottom: 12px; }
+.form-group label { font-size: 0.82rem; font-weight: 600; color: var(--texto-suave); margin-bottom: 4px; }
+.form-group input {
+  padding: 9px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+.form-group input:focus { outline: none; border-color: var(--rosado-oscuro); }
+.form-actions { display: flex; align-items: flex-end; }
+
+/* Botones */
+.btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-primary { background: var(--rosado-oscuro); color: #fff; }
+.btn-primary:hover { background: #a01650; }
+.btn-secondary { background: var(--rosado-claro); color: var(--rosado-oscuro); }
+.btn-secondary:hover { background: var(--rosado-medio); }
+
+/* Mensajes de resultado (éxito / error) */
+.mensaje { margin-top: 10px; font-size: 0.88rem; min-height: 1.2em; }
+.mensaje.exito { color: var(--exito); }
+.mensaje.error { color: var(--error); }
+
+/* Estados vacíos */
+.empty-state { color: var(--texto-suave); font-style: italic; padding: 8px 0; }
+
+/* Alertas de stock bajo (HU-04) */
+.alertas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.alerta-item {
+  background: var(--alerta-fondo);
+  border: 1px solid #ffe0b2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  color: #7a3e00;
+}
+
+/* Tabla de inventario (HU-05) */
+.tabla-inventario { width: 100%; border-collapse: collapse; }
+.tabla-inventario th,
+.tabla-inventario td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.88rem;
+}
+.tabla-inventario th {
+  background: var(--rosado-claro);
+  color: var(--rosado-oscuro);
+  font-weight: 600;
+}
+.tabla-inventario tbody tr:hover { background: #fafafa; }
+
+/* Badges de estado de stock */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.badge-ok { background: var(--exito-fondo); color: var(--exito); }
+.badge-low { background: var(--error-fondo); color: var(--error); }
+
+/* Pestañas del panel */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--borde);
+}
+.tab-btn {
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.tab-btn:hover { color: var(--rosado-oscuro); }
+.tab-btn.active { color: var(--rosado-oscuro); border-bottom-color: var(--rosado-oscuro); }
+
+/* Ventas y Facturación */
+.venta-totales { margin-top: 16px; }
+
+.resumen-totales {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--borde);
+  text-align: right;
+}
+.resumen-totales p { margin: 4px 0; font-size: 0.9rem; color: var(--texto-suave); }
+.resumen-totales strong { color: var(--texto); }
+.resumen-totales .total-final { font-size: 1.1rem; }
+.resumen-totales .total-final strong { color: var(--rosado-oscuro); }
+
+.factura-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--rosado-oscuro);
+}
+.factura-header h2 { margin: 0; color: var(--rosado-oscuro); }
+.factura-meta { text-align: right; font-size: 0.88rem; color: var(--texto-suave); }
+.factura-meta p { margin: 2px 0; }
+
+@media print {
+  .no-print, .header, .tabs { display: none !important; }
+  .card.factura { box-shadow: none; border: none; }
+  body { background: #fff; }
+}
+
+/* Utilidades y Layout General */
+.hidden { display: none !important; }
+.span-2 { grid-column: span 2; }
+.table-responsive { overflow-x: auto; }
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-full { width: 100%; margin-top: 10px; }
+.btn-logout { background-color: #e0e0e0; color: #333; }
+.btn-logout:hover { background-color: #d6d6d6; }
+
+/* Vista Login (HU-01) */
+.login-container {
+  min-height: 80vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  border-top: 5px solid var(--rosado-oscuro);
+}
+
+.header-login {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.header-login h1 { color: var(--rosado-oscuro); }
+
+/* Grillas de Formularios (HU-02 y HU-03) */
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 600px) {
+  .form-grid-2col, .form-grid-3col {
+    grid-template-columns: 1fr;
+  }
+  .span-2 { grid-column: span 1; }
+}

@@ -177,10 +177,61 @@ function desactivarProducto(id) {
   return { exito: true, producto: productosRepo.desactivar(id) };
 }
 
+// --- Nuevas funciones de Dominio para HU-03, HU-04 y HU-05 ---
+
+// HU-03: Actualizar stock por ingreso de productos
+function ingresarStock(id, cantidad) {
+  const producto = productosRepo.buscarPorId(id);
+  if (!producto) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
+  }
+
+  const cantidadEntera = aEntero(cantidad);
+  if (!Number.isInteger(cantidadEntera) || cantidadEntera <= 0) {
+    return {
+      exito: false,
+      error: 'cantidad_invalida',
+      mensaje: 'La cantidad a ingresar debe ser un número entero mayor a cero.',
+    };
+  }
+
+  const productoActualizado = productosRepo.actualizarStock(id, cantidadEntera);
+
+  return {
+    exito: true,
+    producto: productoActualizado,
+    bajoStock: productoActualizado.stock_actual <= productoActualizado.stock_minimo,
+  };
+}
+
+// HU-04: Consultar productos con alerta de stock bajo
+function obtenerAlertasStock() {
+  const productos = productosRepo.listarBajoStock();
+  return {
+    exito: true,
+    totalAlertas: productos.length,
+    productos,
+  };
+}
+
+// HU-05: Consultar stock disponible en tiempo real
+function consultarStockTiempoReal() {
+  const stock = productosRepo.obtenerStockEnTiempoReal();
+  return {
+    exito: true,
+    inventario: stock,
+  };
+}
+
 module.exports = {
   crearProducto,
   listarProductos,
   buscarPorCodigoBarras,
   actualizarProducto,
   desactivarProducto,
+  // Nuevas exportaciones:
+  ingresarStock,
+  obtenerAlertasStock,
+  consultarStockTiempoReal,
 };
+
