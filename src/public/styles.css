@@ -175,6 +175,7 @@ body {
   border-bottom: 2px solid var(--rosado-oscuro);
 }
 .factura-header h2 { margin: 0; color: var(--rosado-oscuro); }
+.factura-logo { display: block; max-height: 56px; max-width: 220px; margin-bottom: 6px; }
 .factura-meta { text-align: right; font-size: 0.88rem; color: var(--texto-suave); }
 .factura-meta p { margin: 2px 0; }
 

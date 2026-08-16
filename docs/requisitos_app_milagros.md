@@ -80,6 +80,7 @@ Como usuario, quiero registrar ventas a crédito y las deudas asociadas, para sa
 
 **HU-13**
 Como usuario, quiero ver una lista de clientes con deudas pendientes, para gestionar los cobros.
+- Si una deuda tiene más de 30 días desde la fecha de la venta sin saldarse completamente, debe mostrarse una advertencia visual en el listado de deudores.
 
 ---
 

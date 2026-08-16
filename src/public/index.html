@@ -48,6 +48,7 @@
         <button type="button" class="tab-btn active" data-tab="productos">🏷️ Productos</button>
         <button type="button" class="tab-btn" data-tab="facturas">🧾 Facturas</button>
         <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
+        <button type="button" class="tab-btn" data-tab="configuracion">⚙️ Configuración</button>
       </nav>
 
       <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
@@ -240,7 +241,9 @@
         <section id="factura-generada" class="card factura hidden">
           <div class="factura-header">
             <div>
-              <h2>Milagros</h2>
+              <img id="factura-logo" class="factura-logo hidden" alt="Logo de la empresa">
+              <h2 id="factura-empresa-nombre">Milagros</h2>
+              <p id="factura-empresa-datos" class="subtitle"></p>
               <p class="subtitle">Comprobante de Venta</p>
             </div>
             <div class="factura-meta">
@@ -383,6 +386,44 @@
           <div id="mensaje-abono" class="mensaje"></div>
         </section>
 
+      </div>
+
+      <!-- Pestaña: Configuración de la empresa (HU-18) -->
+      <div id="tab-configuracion" class="tab-panel hidden">
+        <section class="card">
+          <h2>⚙️ Datos de la Empresa (HU-18)</h2>
+          <p class="empty-state">Estos datos aparecen en el encabezado de cada factura impresa y del correo (HU-06/HU-07).</p>
+          <form id="form-configuracion" class="form-grid-2col">
+            <div class="form-group">
+              <label for="config-nombre">Nombre de la Empresa *</label>
+              <input type="text" id="config-nombre" required>
+            </div>
+            <div class="form-group">
+              <label for="config-nit">NIT</label>
+              <input type="text" id="config-nit" placeholder="Ej: 900123456-7">
+            </div>
+            <div class="form-group span-2">
+              <label for="config-direccion">Dirección</label>
+              <input type="text" id="config-direccion">
+            </div>
+            <div class="form-group">
+              <label for="config-telefono">Teléfono</label>
+              <input type="text" id="config-telefono">
+            </div>
+            <div class="form-group">
+              <label for="config-correo">Correo</label>
+              <input type="email" id="config-correo">
+            </div>
+            <div class="form-group span-2">
+              <label for="config-logo">Ruta o URL del Logo</label>
+              <input type="text" id="config-logo" placeholder="Ej: uploads/logo.png">
+            </div>
+            <div class="form-actions span-2">
+              <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            </div>
+          </form>
+          <div id="mensaje-configuracion" class="mensaje"></div>
+        </section>
       </div>
 
     </main>
