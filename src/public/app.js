@@ -830,11 +830,12 @@ btnVerDeuda.addEventListener('click', async () => {
             <td>$${v.total.toLocaleString()}</td>
             <td>$${v.abonado.toLocaleString()}</td>
             <td>$${v.saldo.toLocaleString()}</td>
+            <td><button type="button" class="btn btn-secondary btn-ver-factura" data-venta-id="${v.venta_id}">Ver factura</button></td>
           </tr>
         `
           )
           .join('')
-      : '<tr><td colspan="5" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
+      : '<tr><td colspan="6" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
 
     const filasAbonos = data.abonos.length
       ? data.abonos.map((a) => `<li>Venta #${a.venta_id}: $${a.monto.toLocaleString()} (${a.creado_en})</li>`).join('')
@@ -844,7 +845,7 @@ btnVerDeuda.addEventListener('click', async () => {
       <p><strong>${data.cliente.nombre}</strong> — Saldo total pendiente: <strong>$${data.saldoTotal.toLocaleString()}</strong></p>
       <table class="tabla-inventario">
         <thead>
-          <tr><th>Venta</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th></tr>
+          <tr><th>Venta</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Factura</th></tr>
         </thead>
         <tbody>${filasVentas}</tbody>
       </table>
@@ -854,6 +855,38 @@ btnVerDeuda.addEventListener('click', async () => {
   } catch (err) {
     detalleDeuda.innerHTML = '<p class="empty-state">Error de conexión al consultar la deuda.</p>';
   }
+});
+
+// Ver la factura completa (items, cantidades, precios) de una venta desde
+// cualquier listado que solo muestre totales (detalle de deuda, listado de
+// reportes). Reutiliza GET /api/ventas/:id — ya trae los items y el
+// desglose de IVA — y mostrarFactura(), la misma función que ya pinta la
+// factura recién generada en HU-06/07: no se duplica el renderizado en
+// ningún lado nuevo.
+async function verFacturaCompleta(ventaId) {
+  try {
+    const res = await fetch(`${API_URL}/ventas/${ventaId}`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      window.alert(data.mensaje || 'No se pudo cargar la factura.');
+      return;
+    }
+
+    document.querySelector('.tab-btn[data-tab="facturas"]').click();
+    mostrarFactura(data.venta);
+  } catch (err) {
+    window.alert('Error de conexión al cargar la factura.');
+  }
+}
+
+// Delegación de eventos: las filas de detalle-deuda se regeneran por
+// completo con innerHTML en cada consulta, así que un listener por botón se
+// perdería; uno solo en el contenedor cubre todos los botones presentes y futuros.
+detalleDeuda.addEventListener('click', (e) => {
+  const boton = e.target.closest('.btn-ver-factura');
+  if (!boton) return;
+  verFacturaCompleta(boton.dataset.ventaId);
 });
 
 // HU-12: registrar abono
@@ -1064,6 +1097,94 @@ document.getElementById('btn-historico').addEventListener('click', async () => {
     mensajeHistorico.textContent = 'Error de conexión al consultar el histórico.';
     mensajeHistorico.classList.add('error');
   }
+});
+
+// Listado de ventas individuales que componen un reporte (HU-14/HU-15):
+// misma tabla para ambos casos, con un botón "Ver factura" por fila que
+// reutiliza verFacturaCompleta() (la misma función que ya usa el detalle de
+// deuda de un cliente).
+function renderizarListadoVentas(tbody, ventas) {
+  if (!ventas || ventas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Sin ventas en este rango.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = ventas
+    .map(
+      (v) => `
+      <tr>
+        <td>${v.id}</td>
+        <td>${v.creado_en}</td>
+        <td>${v.nombre_cliente || 'Mostrador'}</td>
+        <td>${ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago}</td>
+        <td>$${v.total.toLocaleString()}</td>
+        <td><button type="button" class="btn btn-secondary btn-ver-factura" data-venta-id="${v.id}">Ver factura</button></td>
+      </tr>
+    `
+    )
+    .join('');
+}
+
+document.getElementById('btn-listado-ventas-hoy').addEventListener('click', async () => {
+  const tbody = document.getElementById('tabla-body-listado-ventas-hoy');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/ventas-dia/listado`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${data.mensaje || 'No se pudo cargar el listado.'}</td></tr>`;
+      return;
+    }
+
+    renderizarListadoVentas(tbody, data.ventas);
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error de conexión al cargar el listado.</td></tr>';
+  }
+});
+
+document.getElementById('btn-listado-historico').addEventListener('click', async () => {
+  const tbody = document.getElementById('tabla-body-listado-historico');
+  const desde = document.getElementById('historico-desde').value;
+  const hasta = document.getElementById('historico-hasta').value;
+
+  if (!desde || !hasta) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Elegí ambas fechas (desde y hasta) arriba y consultá de nuevo.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/historico/listado?desde=${desde}&hasta=${hasta}`, {
+      headers: obtenerHeaders(),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${data.mensaje || 'No se pudo cargar el listado.'}</td></tr>`;
+      return;
+    }
+
+    renderizarListadoVentas(tbody, data.ventas);
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error de conexión al cargar el listado.</td></tr>';
+  }
+});
+
+// Misma delegación de eventos que detalleDeuda: ambas tablas de listado se
+// regeneran con innerHTML en cada consulta.
+document.getElementById('tabla-body-listado-ventas-hoy').addEventListener('click', (e) => {
+  const boton = e.target.closest('.btn-ver-factura');
+  if (!boton) return;
+  verFacturaCompleta(boton.dataset.ventaId);
+});
+
+document.getElementById('tabla-body-listado-historico').addEventListener('click', (e) => {
+  const boton = e.target.closest('.btn-ver-factura');
+  if (!boton) return;
+  verFacturaCompleta(boton.dataset.ventaId);
 });
 
 // HU-16: ranking de productos más vendidos, con rango de fechas opcional.

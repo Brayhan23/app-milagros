@@ -293,3 +293,38 @@ CREATE TABLE IF NOT EXISTS auditoria (
 
 CREATE INDEX IF NOT EXISTS idx_auditoria_creado_en ON auditoria(creado_en);
 CREATE INDEX IF NOT EXISTS idx_auditoria_accion ON auditoria(accion);
+
+-- Requisito adicional: purga automática de auditoría vieja (retención de
+-- AUDITORIA_RETENCION_DIAS, ver auditoriaService.js), CON archivado previo.
+--
+-- El log de auditoría existe para poder investigar algo sospechoso después;
+-- borrar sin más los registros vencidos destruiría justo la evidencia que
+-- más podría hacer falta (ej. un fraude que se nota 45 días después de
+-- ocurrido). Por eso la purga NO es un DELETE directo: primero copia cada
+-- fila vencida (mismo id, para poder correlacionarla) a esta tabla espejo,
+-- recién después la borra de `auditoria` (ver auditoriaRepo.purgarAntiguos).
+--
+-- Por qué una tabla espejo en el MISMO archivo .db, y no un archivo aparte
+-- (JSON/CSV) en logs/: esta tabla queda cubierta automáticamente por el
+-- backup diario ya existente (backupService.js hace db.backup() del archivo
+-- .db COMPLETO hacia Google Drive Desktop) — sin agregar infraestructura
+-- nueva ni tocar esa lógica de backup. Un archivo aparte en logs/ NO se
+-- respalda hoy, así que sería menos seguro que la propia tabla activa.
+--
+-- Sin su propia purga: es el destino final. El volumen de auditoría de una
+-- tienda local es bajo, así que conservarla indefinidamente no es un
+-- problema real de espacio — el problema que se resuelve purgando es que
+-- `auditoria` (la tabla ACTIVA que se consulta día a día) se mantenga
+-- liviana, no que la evidencia desaparezca.
+CREATE TABLE IF NOT EXISTS auditoria_archivo (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  usuario TEXT NOT NULL,
+  accion TEXT NOT NULL,
+  entidad TEXT,
+  entidad_id INTEGER,
+  detalle TEXT,
+  ip TEXT,
+  creado_en TEXT NOT NULL,
+  purgado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);

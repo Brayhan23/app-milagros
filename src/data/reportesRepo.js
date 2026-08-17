@@ -125,4 +125,25 @@ function productosMasVendidos({ desde, hasta } = {}) {
     .all(...parametros);
 }
 
-module.exports = { resumenVentasPorRango, productosMasVendidos };
+// Ventas individuales que componen un reporte (del día o de un rango), para
+// poder navegar de "totales" a "cuáles ventas concretas los componen".
+// Trae solo campos livianos (sin items) — para ver el detalle completo de
+// una venta puntual, el frontend llama a GET /api/ventas/:id (ya existente,
+// no se duplica esa consulta ni el armado de items aquí).
+// LEFT JOIN clientes: "muchas ventas -> un cliente", mismo tipo de JOIN
+// "hacia arriba" que ya usa gananciaFila arriba (no hay fan-out); LEFT
+// porque cliente_id es nullable (venta de mostrador sin cliente asociado).
+function listarVentasPorRango(desde, hasta) {
+  return db
+    .prepare(
+      `SELECT v.id, v.creado_en, v.tipo_cliente, v.metodo_pago, v.subtotal, v.descuento, v.total,
+              v.cliente_id, c.nombre AS nombre_cliente
+       FROM ventas v
+       LEFT JOIN clientes c ON c.id = v.cliente_id
+       WHERE date(v.creado_en, ?) BETWEEN ? AND ?
+       ORDER BY v.creado_en DESC`
+    )
+    .all(DESPLAZAMIENTO_COLOMBIA, desde, hasta);
+}
+
+module.exports = { resumenVentasPorRango, productosMasVendidos, listarVentasPorRango };

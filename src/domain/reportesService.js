@@ -45,6 +45,30 @@ function historicoPorRango(desde, hasta) {
   return { exito: true, desde, hasta, ...resumen };
 }
 
+// Listado de ventas individuales del día (misma fecha "hoy" en Colombia que
+// ventasDelDia), para poder navegar del resumen HU-14 a cada venta puntual.
+function ventasDelDiaListado() {
+  const hoy = fechaColombiaHoy();
+  const ventas = reportesRepo.listarVentasPorRango(hoy, hoy);
+  return { exito: true, fecha: hoy, ventas };
+}
+
+// Mismo listado, para un rango arbitrario (HU-15). Misma validación que
+// historicoPorRango, para que ambos endpoints acepten/rechacen exactamente
+// el mismo tipo de fechas.
+function historicoListado(desde, hasta) {
+  if (!esFechaValida(desde) || !esFechaValida(hasta)) {
+    return { exito: false, error: 'fecha_invalida', mensaje: 'Las fechas deben tener el formato AAAA-MM-DD y ser válidas.' };
+  }
+
+  if (desde > hasta) {
+    return { exito: false, error: 'rango_invalido', mensaje: 'La fecha inicial no puede ser posterior a la final.' };
+  }
+
+  const ventas = reportesRepo.listarVentasPorRango(desde, hasta);
+  return { exito: true, desde, hasta, ventas };
+}
+
 function productosMasVendidos({ desde, hasta } = {}) {
   if (Boolean(desde) !== Boolean(hasta)) {
     return { exito: false, error: 'rango_invalido', mensaje: 'Debes indicar ambas fechas (desde y hasta) o ninguna.' };
@@ -63,4 +87,4 @@ function productosMasVendidos({ desde, hasta } = {}) {
   return { exito: true, productos };
 }
 
-module.exports = { ventasDelDia, historicoPorRango, productosMasVendidos };
+module.exports = { ventasDelDia, historicoPorRango, ventasDelDiaListado, historicoListado, productosMasVendidos };

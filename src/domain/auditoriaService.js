@@ -1,5 +1,13 @@
 const auditoriaRepo = require('../data/auditoriaRepo');
 
+// Mismo patrón que BACKUP_RETENCION_DIAS/INTERVALO_CHEQUEO_MS en
+// backupService.js: chequeo periódico en memoria (setInterval), no un cron
+// externo ni una Tarea Programada de Windows — no hay nada que instalar por
+// fuera de la app, y un chequeo cada hora alcanza sobrado para un ciclo de
+// purga que se mide en días.
+const AUDITORIA_RETENCION_DIAS = parseInt(process.env.AUDITORIA_RETENCION_DIAS, 10) || 30;
+const INTERVALO_CHEQUEO_MS = 60 * 60 * 1000; // 1 hora
+
 // Códigos fijos de acción, usados por el resto de servicios al llamar a
 // registrar() y por la ruta de consulta para validar filtros. Evita que una
 // acción quede mal escrita ("venta_creada" vs "ventaCreada") y rompa
@@ -101,4 +109,39 @@ function listarEventos({ desde, hasta, accion, usuario } = {}) {
   return { exito: true, eventos };
 }
 
-module.exports = { registrar, resumirCambios, listarEventos, ACCIONES };
+// Purga (con archivado previo, ver auditoriaRepo.purgarAntiguos y el
+// comentario extendido en schema.sql sobre auditoria_archivo) de registros
+// más viejos que AUDITORIA_RETENCION_DIAS. Se llama sola cada hora vía
+// iniciarProgramacionPurga(); llamarla de nuevo antes de que pase una hora
+// no hace daño, es idempotente (si no hay nada vencido, no mueve ni borra
+// ninguna fila).
+//
+// El resultado se deja SOLO en consola, nunca en la propia tabla auditoria:
+// registrar ahí "se purgó auditoría" generaría un evento nuevo que algún
+// día también habría que purgar — recursión sin fin que además ensuciaría
+// el log con eventos sobre sí mismo en vez de sobre acciones reales del
+// negocio.
+function purgarAntiguos() {
+  const cantidad = auditoriaRepo.purgarAntiguos(AUDITORIA_RETENCION_DIAS);
+  console.log(
+    `[auditoria] Purga ejecutada: ${cantidad} registro(s) archivado(s) en auditoria_archivo y eliminado(s) de auditoria (retención: ${AUDITORIA_RETENCION_DIAS} días).`
+  );
+  return cantidad;
+}
+
+function iniciarProgramacionPurga() {
+  try {
+    purgarAntiguos();
+  } catch (error) {
+    console.error('Error al purgar auditoría (arranque):', error.message);
+  }
+  setInterval(() => {
+    try {
+      purgarAntiguos();
+    } catch (error) {
+      console.error('Error al purgar auditoría:', error.message);
+    }
+  }, INTERVALO_CHEQUEO_MS);
+}
+
+module.exports = { registrar, resumirCambios, listarEventos, purgarAntiguos, iniciarProgramacionPurga, ACCIONES };

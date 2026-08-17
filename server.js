@@ -10,6 +10,7 @@ const clientesRoutes = require('./src/routes/clientesRoutes');
 const configuracionRoutes = require('./src/routes/configuracionRoutes');
 const reportesRoutes = require('./src/routes/reportesRoutes');
 const auditoriaRoutes = require('./src/routes/auditoriaRoutes');
+const auditoriaService = require('./src/domain/auditoriaService');
 const requiereSesion = require('./src/routes/middlewares/requiereSesion');
 const app = express();
 
@@ -30,4 +31,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
   backupService.iniciarProgramacionBackup();
+  auditoriaService.iniciarProgramacionPurga();
 });

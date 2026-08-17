@@ -415,6 +415,7 @@
               <button type="button" id="btn-ver-deuda" class="btn btn-secondary">Consultar</button>
             </div>
           </div>
+          <p class="empty-state">"Ver factura" abre el comprobante completo en la pestaña Facturas (mismo detalle que al generar la venta).</p>
           <div id="detalle-deuda"></div>
         </section>
 
@@ -491,6 +492,21 @@
             <button type="button" id="btn-ventas-hoy" class="btn btn-secondary">Cargar Hoy</button>
           </div>
           <div id="resumen-ventas-hoy" class="empty-state">Sin cargar todavía.</div>
+
+          <div class="card-header">
+            <h2 class="subtitle">Ventas individuales de hoy</h2>
+            <button type="button" id="btn-listado-ventas-hoy" class="btn btn-secondary">Ver Ventas del Día</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr><th>Venta</th><th>Hora</th><th>Cliente</th><th>Método</th><th>Total</th><th>Factura</th></tr>
+              </thead>
+              <tbody id="tabla-body-listado-ventas-hoy">
+                <tr><td colspan="6" class="empty-state">Sin cargar todavía.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- HU-15: Histórico por rango de fechas -->
@@ -511,6 +527,21 @@
           </div>
           <div id="mensaje-historico" class="mensaje"></div>
           <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
+
+          <div class="card-header">
+            <h2 class="subtitle">Ventas individuales del rango</h2>
+            <button type="button" id="btn-listado-historico" class="btn btn-secondary">Ver Ventas del Rango</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Método</th><th>Total</th><th>Factura</th></tr>
+              </thead>
+              <tbody id="tabla-body-listado-historico">
+                <tr><td colspan="6" class="empty-state">Elegí un rango y consultá.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- HU-16: Productos más vendidos -->
