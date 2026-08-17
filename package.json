@@ -3,23 +3,20 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-
-  
- "scripts": {
-  "start": "node server.js",
-  "crear-admin": "node scripts/crear-admin.js",
-  "verificar-backup": "node scripts/verificar-backup.js",
-  "test": "echo \"Error: no test specified\" && exit 1"
-},
-  
+  "scripts": {
+    "start": "node server.js",
+    "crear-admin": "node scripts/crear-admin.js",
+    "verificar-backup": "node scripts/verificar-backup.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^11.10.0",
-    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "nodemailer": "^9.0.5"
   }
 }

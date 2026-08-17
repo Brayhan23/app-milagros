@@ -150,3 +150,7 @@ vite.config.ts.timestamp-*
 *.db-shm
 /data/
 /backups-local/
+
+# HU-18: logos que suba cada instalación (contenido de runtime, no de código)
+/src/public/uploads/*
+!/src/public/uploads/.gitkeep

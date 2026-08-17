@@ -52,6 +52,41 @@ function desactivar(id) {
   return buscarPorId(id);
 }
 
+// --- Nuevas funciones para HU-03, HU-04 y HU-05 ---
+
+function actualizarStock(id, cantidad) {
+  db.prepare(
+    `UPDATE productos 
+     SET stock_actual = stock_actual + ?, 
+         actualizado_en = datetime('now') 
+     WHERE id = ?`
+  ).run(cantidad, id);
+
+  return buscarPorId(id);
+}
+
+function listarBajoStock() {
+  return db
+    .prepare(
+      `SELECT * FROM productos 
+       WHERE activo = 1 AND stock_actual <= stock_minimo 
+       ORDER BY stock_actual ASC, nombre ASC`
+    )
+    .all();
+}
+
+function obtenerStockEnTiempoReal() {
+  return db
+    .prepare(
+      `SELECT id, codigo_barras, nombre, stock_actual, stock_minimo,
+              (stock_actual <= stock_minimo) AS bajo_stock
+       FROM productos 
+       WHERE activo = 1 
+       ORDER BY nombre ASC`
+    )
+    .all();
+}
+// --- HU-03, HU-04 y HU-05 ---
 module.exports = {
   buscarPorId,
   buscarPorCodigoBarras,
@@ -59,4 +94,10 @@ module.exports = {
   crear,
   actualizar,
   desactivar,
+  // Nuevas exportaciones:
+  actualizarStock,
+  listarBajoStock,
+  obtenerStockEnTiempoReal,
 };
+
+

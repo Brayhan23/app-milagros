@@ -25,4 +25,34 @@ if (!dbExistia) {
   console.log(`Base de datos creada en ${dbPath} a partir de schema.sql`);
 }
 
+// Migraciones puntuales: CREATE TABLE IF NOT EXISTS no puede agregar una
+// columna a una tabla que ya existe, así que una BD creada antes de HU-11
+// (con la tabla `ventas` ya presente pero sin `cliente_id`) se queda atrás.
+// Se corrige con un ALTER TABLE explícito, protegido por PRAGMA table_info
+// para que sea idempotente y no falle en arranques posteriores ni en una BD
+// nueva (donde schema.sql ya crea la columna y aquí no hay nada que hacer).
+// Probado contra una copia real de la BD de este proyecto antes de aplicarlo.
+function columnaExiste(tabla, columna) {
+  return db
+    .prepare(`PRAGMA table_info(${tabla})`)
+    .all()
+    .some((columnaInfo) => columnaInfo.name === columna);
+}
+
+if (!columnaExiste('ventas', 'cliente_id')) {
+  db.exec('ALTER TABLE ventas ADD COLUMN cliente_id INTEGER REFERENCES clientes(id)');
+  console.log('Migración aplicada: ventas.cliente_id agregada (HU-11/HU-12/HU-13).');
+}
+
+// HU-14: mismo patrón que cliente_id arriba. venta_items.precio_compra_unitario
+// no existía antes de los reportes de ganancia; en una BD ya creada, el
+// CREATE TABLE IF NOT EXISTS de arriba no le agrega la columna a la tabla
+// existente. Queda NULL para las filas viejas (no hay forma de reconstruir
+// un costo histórico que nunca se guardó) — reportesRepo.js lo aproxima con
+// el precio_compra actual del producto para esos casos.
+if (!columnaExiste('venta_items', 'precio_compra_unitario')) {
+  db.exec('ALTER TABLE venta_items ADD COLUMN precio_compra_unitario INTEGER CHECK (precio_compra_unitario >= 0)');
+  console.log('Migración aplicada: venta_items.precio_compra_unitario agregada (HU-14).');
+}
+
 module.exports = db;

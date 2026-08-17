@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Milagros — Gestión de Inventario</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Vista: Login (HU-01) -->
+  <div id="vista-login" class="login-container">
+    <div class="card login-card">
+      <div class="header-login">
+        <h1>Milagros</h1>
+        <p>Iniciar Sesión</p>
+      </div>
+      <form id="form-login">
+        <div class="form-group">
+          <label for="login-usuario">Usuario</label>
+          <input type="text" id="login-usuario" placeholder="Ingrese usuario" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Contraseña</label>
+          <input type="password" id="login-password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Ingresar</button>
+      </form>
+      <div id="mensaje-login" class="mensaje"></div>
+    </div>
+  </div>
+
+  <!-- Vista: Panel Principal (HU-02, HU-03, HU-04, HU-05) -->
+  <div id="vista-panel" class="hidden">
+    <header class="header">
+      <div class="header-content">
+        <div>
+          <h1>Milagros — Control de Inventario</h1>
+          <p class="subtitle">Módulo de Autenticación, Productos y Stock</p>
+        </div>
+        <button id="btn-logout" class="btn btn-logout">Cerrar Sesión</button>
+      </div>
+    </header>
+
+    <main class="container">
+
+      <nav class="tabs">
+        <button type="button" class="tab-btn active" data-tab="productos">🏷️ Productos</button>
+        <button type="button" class="tab-btn" data-tab="facturas">🧾 Facturas</button>
+        <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
+        <button type="button" class="tab-btn" data-tab="configuracion">⚙️ Configuración</button>
+        <button type="button" class="tab-btn" data-tab="reportes">📊 Reportes</button>
+        <button type="button" class="tab-btn" data-tab="auditoria">🔍 Auditoría</button>
+      </nav>
+
+      <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
+      <div id="tab-productos" class="tab-panel">
+
+        <!-- HU-04: Alertas de Stock Bajo -->
+        <section class="card alert-card">
+          <h2>⚠️ Alertas de Stock Bajo (HU-04)</h2>
+          <button id="btn-actualizar-alertas" class="btn btn-secondary">Refrescar Alertas</button>
+          <div id="contenedor-alertas" class="alertas-grid">
+            <p class="empty-state">Cargando alertas...</p>
+          </div>
+        </section>
+
+        <!-- HU-02: Registrar Nuevo Producto con Código de Barras -->
+        <section class="card">
+          <h2>🏷️ Registrar Nuevo Producto (HU-02)</h2>
+          <form id="form-producto" class="form-grid-2col">
+            <div class="form-group">
+              <label for="prod-codigo">Código de Barras</label>
+              <input type="text" id="prod-codigo" placeholder="Ej: 7701234567890">
+            </div>
+            <div class="form-group">
+              <label for="prod-nombre">Nombre del Producto *</label>
+              <input type="text" id="prod-nombre" placeholder="Ej: Jabón de Rosas" required>
+            </div>
+            <div class="form-group span-2">
+              <label for="prod-descripcion">Descripción</label>
+              <input type="text" id="prod-descripcion" placeholder="Descripción breve">
+            </div>
+            <div class="form-group">
+              <label for="prod-pcompra">Precio de Compra ($)</label>
+              <input type="number" id="prod-pcompra" placeholder="0" min="0" required>
+            </div>
+            <div class="form-group">
+              <label for="prod-pdetal">Precio al Detal ($)</label>
+              <input type="number" id="prod-pdetal" placeholder="0" min="0" required>
+            </div>
+            <div class="form-group">
+              <label for="prod-pmayor">Precio al Por Mayor ($)</label>
+              <input type="number" id="prod-pmayor" placeholder="0" min="0" required>
+            </div>
+            <div class="form-group">
+              <label for="prod-stock-inicial">Stock Inicial</label>
+              <input type="number" id="prod-stock-inicial" placeholder="0" min="0" value="0">
+            </div>
+            <div class="form-group">
+              <label for="prod-stock-minimo">Stock Mínimo (Alerta)</label>
+              <input type="number" id="prod-stock-minimo" placeholder="0" min="0" value="5">
+            </div>
+            <div class="form-actions span-2">
+              <button type="submit" class="btn btn-primary">Guardar Producto</button>
+            </div>
+          </form>
+          <div id="mensaje-producto" class="mensaje"></div>
+        </section>
+
+        <!-- HU-03: Registrar Entrada de Stock -->
+        <section class="card">
+          <h2>📦 Registrar Entrada de Stock (HU-03)</h2>
+          <form id="form-stock" class="form-grid-3col">
+            <div class="form-group">
+              <label for="stock-producto-id">ID del Producto</label>
+              <input type="number" id="stock-producto-id" placeholder="Ej: 1" required>
+            </div>
+            <div class="form-group">
+              <label for="stock-cantidad">Cantidad Entrante</label>
+              <input type="number" id="stock-cantidad" min="1" placeholder="Ej: 10" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Sumar al Stock</button>
+            </div>
+          </form>
+          <div id="mensaje-stock" class="mensaje"></div>
+        </section>
+
+        <!-- HU-05: Ver Stock en Tiempo Real -->
+        <section class="card">
+          <div class="card-header">
+            <h2>📊 Stock Disponible en Tiempo Real (HU-05)</h2>
+            <button id="btn-cargar-stock" class="btn btn-secondary">Actualizar Lista</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th>P. Compra</th>
+                  <th>P. Detal</th>
+                  <th>P. Mayor</th>
+                  <th>Stock Actual</th>
+                  <th>Stock Mín.</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-stock">
+                <tr>
+                  <td colspan="9" class="empty-state">Cargando inventario...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Pestaña: Facturas (HU-06, HU-08, HU-09, HU-10) -->
+      <div id="tab-facturas" class="tab-panel hidden">
+
+        <!-- Armar la venta -->
+        <section class="card no-print">
+          <h2>🧾 Nueva Venta</h2>
+
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="venta-producto">Producto</label>
+              <select id="venta-producto"></select>
+            </div>
+            <div class="form-group">
+              <label for="venta-cantidad">Cantidad</label>
+              <input type="number" id="venta-cantidad" min="1" value="1">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-agregar-item" class="btn btn-secondary">Agregar</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cantidad</th>
+                  <th>Precio Unit.</th>
+                  <th>Subtotal</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-carrito">
+                <tr>
+                  <td colspan="5" class="empty-state">Todavía no agregaste productos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="form-grid-3col venta-totales">
+            <div class="form-group">
+              <label for="venta-tipo-cliente">Tipo de Cliente</label>
+              <select id="venta-tipo-cliente">
+                <option value="detal">Detal</option>
+                <option value="mayor">Mayor</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="venta-metodo-pago">Método de Pago</label>
+              <select id="venta-metodo-pago">
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="credito">Crédito</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="venta-descuento">Descuento ($)</label>
+              <input type="number" id="venta-descuento" min="0" value="0">
+            </div>
+          </div>
+
+          <!-- HU-12: obligatorio solo cuando el método de pago es crédito -->
+          <div class="form-group hidden" id="venta-cliente-grupo">
+            <label for="venta-cliente">Cliente (obligatorio para venta a crédito)</label>
+            <select id="venta-cliente"></select>
+          </div>
+
+          <div class="resumen-totales">
+            <p>Subtotal: <strong id="venta-subtotal">$0</strong></p>
+            <p>Descuento: <strong id="venta-descuento-resumen">$0</strong></p>
+            <p class="total-final">Total: <strong id="venta-total">$0</strong></p>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="btn-generar-factura" class="btn btn-primary">Generar Factura</button>
+          </div>
+          <div id="mensaje-venta" class="mensaje"></div>
+        </section>
+
+        <!-- Factura generada (imprimible) -->
+        <section id="factura-generada" class="card factura hidden">
+          <div class="factura-header">
+            <div>
+              <img id="factura-logo" class="factura-logo hidden" alt="Logo de la empresa">
+              <h2 id="factura-empresa-nombre">Milagros</h2>
+              <p id="factura-empresa-datos" class="subtitle"></p>
+              <p class="subtitle">Comprobante de Venta</p>
+            </div>
+            <div class="factura-meta">
+              <p>Factura N.° <strong id="factura-id"></strong></p>
+              <p id="factura-fecha"></p>
+            </div>
+          </div>
+
+          <table class="tabla-inventario">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unit.</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="factura-items"></tbody>
+          </table>
+
+          <div class="resumen-totales">
+            <p>Tipo de Cliente: <strong id="factura-tipo-cliente"></strong></p>
+            <p>Método de Pago: <strong id="factura-metodo-pago"></strong></p>
+            <p>Subtotal: <strong id="factura-subtotal"></strong></p>
+            <p>Descuento: <strong id="factura-descuento"></strong></p>
+            <p class="total-final">Total: <strong id="factura-total"></strong></p>
+          </div>
+
+          <div class="form-actions no-print">
+            <button type="button" id="btn-imprimir-factura" class="btn btn-primary">Imprimir</button>
+            <button type="button" id="btn-nueva-venta" class="btn btn-secondary">Nueva Venta</button>
+          </div>
+
+          <!-- HU-07: Enviar copia de la factura por correo -->
+          <div class="no-print factura-email">
+            <div class="form-group">
+              <label for="factura-correo">Enviar copia por correo</label>
+              <input type="email" id="factura-correo" placeholder="cliente@correo.com">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-enviar-correo" class="btn btn-secondary">Enviar por Correo</button>
+            </div>
+            <div id="mensaje-correo" class="mensaje"></div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Pestaña: Clientes y créditos (HU-11, HU-12, HU-13) -->
+      <div id="tab-clientes" class="tab-panel hidden">
+
+        <!-- HU-11: Registrar cliente -->
+        <section class="card">
+          <h2>👤 Registrar Cliente (HU-11)</h2>
+          <form id="form-cliente" class="form-grid-2col">
+            <div class="form-group">
+              <label for="cliente-nombre">Nombre *</label>
+              <input type="text" id="cliente-nombre" placeholder="Ej: Juan Pérez" required>
+            </div>
+            <div class="form-group">
+              <label for="cliente-documento">Documento</label>
+              <input type="text" id="cliente-documento" placeholder="Ej: 123456789">
+            </div>
+            <div class="form-group">
+              <label for="cliente-telefono">Teléfono</label>
+              <input type="text" id="cliente-telefono" placeholder="Ej: 3001234567">
+            </div>
+            <div class="form-group">
+              <label for="cliente-correo">Correo</label>
+              <input type="email" id="cliente-correo" placeholder="cliente@correo.com">
+            </div>
+            <div class="form-group">
+              <label for="cliente-mayorista">
+                <input type="checkbox" id="cliente-mayorista"> Es cliente mayorista
+              </label>
+            </div>
+            <div class="form-actions span-2">
+              <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+            </div>
+          </form>
+          <div id="mensaje-cliente" class="mensaje"></div>
+        </section>
+
+        <!-- HU-13: Clientes con deuda pendiente -->
+        <section class="card">
+          <div class="card-header">
+            <h2>💰 Clientes con Deuda Pendiente (HU-13)</h2>
+            <button id="btn-cargar-deudores" class="btn btn-secondary">Actualizar Lista</button>
+          </div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Cliente</th>
+                  <th>Documento</th>
+                  <th>Saldo Pendiente</th>
+                  <th>Antigüedad</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-deudores">
+                <tr>
+                  <td colspan="5" class="empty-state">Cargando deudores...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- HU-12: Detalle de deuda de un cliente -->
+        <section class="card">
+          <h2>📄 Detalle de Deuda de un Cliente</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="deuda-cliente-id">ID del Cliente</label>
+              <input type="number" id="deuda-cliente-id" placeholder="Ej: 1">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-ver-deuda" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="detalle-deuda"></div>
+        </section>
+
+        <!-- HU-12: Registrar abono -->
+        <section class="card">
+          <h2>💵 Registrar Abono</h2>
+          <form id="form-abono" class="form-grid-3col">
+            <div class="form-group">
+              <label for="abono-venta-id">ID de la Venta (a crédito)</label>
+              <input type="number" id="abono-venta-id" placeholder="Ej: 3" required>
+            </div>
+            <div class="form-group">
+              <label for="abono-monto">Monto del Abono ($)</label>
+              <input type="number" id="abono-monto" min="1" placeholder="Ej: 20000" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Registrar Abono</button>
+            </div>
+          </form>
+          <div id="mensaje-abono" class="mensaje"></div>
+        </section>
+
+      </div>
+
+      <!-- Pestaña: Configuración de la empresa (HU-18) -->
+      <div id="tab-configuracion" class="tab-panel hidden">
+        <section class="card">
+          <h2>⚙️ Datos de la Empresa (HU-18)</h2>
+          <p class="empty-state">Estos datos aparecen en el encabezado de cada factura impresa y del correo (HU-06/HU-07).</p>
+          <form id="form-configuracion" class="form-grid-2col">
+            <div class="form-group">
+              <label for="config-nombre">Nombre de la Empresa *</label>
+              <input type="text" id="config-nombre" required>
+            </div>
+            <div class="form-group">
+              <label for="config-nit">NIT</label>
+              <input type="text" id="config-nit" placeholder="Ej: 900123456-7">
+            </div>
+            <div class="form-group span-2">
+              <label for="config-direccion">Dirección</label>
+              <input type="text" id="config-direccion">
+            </div>
+            <div class="form-group">
+              <label for="config-telefono">Teléfono</label>
+              <input type="text" id="config-telefono">
+            </div>
+            <div class="form-group">
+              <label for="config-correo">Correo</label>
+              <input type="email" id="config-correo">
+            </div>
+            <div class="form-group span-2">
+              <label for="config-logo">Ruta o URL del Logo</label>
+              <input type="text" id="config-logo" placeholder="Ej: uploads/logo.png">
+            </div>
+            <div class="form-actions span-2">
+              <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            </div>
+          </form>
+          <div id="mensaje-configuracion" class="mensaje"></div>
+        </section>
+      </div>
+
+      <!-- Pestaña: Reportes (HU-14, HU-15, HU-16) -->
+      <div id="tab-reportes" class="tab-panel hidden">
+
+        <!-- HU-14: Ventas y ganancia del día -->
+        <section class="card">
+          <div class="card-header">
+            <h2>📅 Ventas y Ganancia del Día (HU-14)</h2>
+            <button type="button" id="btn-ventas-hoy" class="btn btn-secondary">Cargar Hoy</button>
+          </div>
+          <div id="resumen-ventas-hoy" class="empty-state">Sin cargar todavía.</div>
+        </section>
+
+        <!-- HU-15: Histórico por rango de fechas -->
+        <section class="card">
+          <h2>📈 Histórico por Rango de Fechas (HU-15)</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="historico-desde">Desde</label>
+              <input type="date" id="historico-desde">
+            </div>
+            <div class="form-group">
+              <label for="historico-hasta">Hasta</label>
+              <input type="date" id="historico-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-historico" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="mensaje-historico" class="mensaje"></div>
+          <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
+        </section>
+
+        <!-- HU-16: Productos más vendidos -->
+        <section class="card">
+          <h2>🏆 Productos Más Vendidos (HU-16)</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="ranking-desde">Desde (opcional)</label>
+              <input type="date" id="ranking-desde">
+            </div>
+            <div class="form-group">
+              <label for="ranking-hasta">Hasta (opcional)</label>
+              <input type="date" id="ranking-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-ranking" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="mensaje-ranking" class="mensaje"></div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Unidades Vendidas</th>
+                  <th>Ingreso Generado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-ranking">
+                <tr>
+                  <td colspan="3" class="empty-state">Sin datos todavía.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Pestaña: Auditoría (registro de auditoría, solo lectura) -->
+      <div id="tab-auditoria" class="tab-panel hidden">
+        <section class="card">
+          <h2>🔍 Registro de Auditoría</h2>
+          <p class="empty-state">Trazabilidad de acciones sensibles: quién hizo qué y cuándo. Solo lectura.</p>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="auditoria-desde">Desde</label>
+              <input type="date" id="auditoria-desde">
+            </div>
+            <div class="form-group">
+              <label for="auditoria-hasta">Hasta</label>
+              <input type="date" id="auditoria-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-auditoria" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="auditoria-accion">Acción</label>
+            <select id="auditoria-accion">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div id="mensaje-auditoria" class="mensaje"></div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Usuario</th>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Detalle</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-auditoria">
+                <tr>
+                  <td colspan="6" class="empty-state">Sin datos todavía.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

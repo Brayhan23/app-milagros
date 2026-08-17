@@ -1,5 +1,7 @@
 const bcrypt = require('bcrypt');
 const usuariosRepo = require('../data/usuariosRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 const MAX_INTENTOS_FALLIDOS = 5;
 const DURACION_BLOQUEO_MS = 5 * 60 * 1000; // 5 minutos
@@ -27,10 +29,22 @@ function limpiarIntentos(usuario) {
   intentosPorUsuario.delete(usuario);
 }
 
-function login(usuario, password) {
+// ip es opcional (el caller la pasa cuando la tiene, ej. req.ip en
+// authRoutes.js): se registra en auditoría porque el login, exitoso o
+// fallido, es el evento donde más importa poder distinguir un acceso
+// legítimo de uno indebido. Nunca se audita la contraseña, solo el
+// resultado (éxito/fallo) y quién lo intentó.
+function login(usuario, password, ip = null) {
   if (estaBloqueado(usuario)) {
     const { bloqueadoHasta } = intentosPorUsuario.get(usuario);
     const segundosRestantes = Math.ceil((bloqueadoHasta - Date.now()) / 1000);
+    auditoriaService.registrar({
+      usuario,
+      accion: ACCIONES.LOGIN_FALLIDO,
+      entidad: 'usuario',
+      detalle: `Intento de login para "${usuario}" rechazado: cuenta bloqueada temporalmente.`,
+      ip,
+    });
     return {
       exito: false,
       error: 'bloqueado',
@@ -43,6 +57,14 @@ function login(usuario, password) {
 
   if (!registro || !passwordValida) {
     registrarIntentoFallido(usuario);
+    auditoriaService.registrar({
+      usuario,
+      accion: ACCIONES.LOGIN_FALLIDO,
+      entidad: 'usuario',
+      entidadId: registro ? registro.id : null,
+      detalle: `Intento de login fallido para "${usuario}".`,
+      ip,
+    });
     return {
       exito: false,
       error: 'credenciales_invalidas',
@@ -51,6 +73,14 @@ function login(usuario, password) {
   }
 
   limpiarIntentos(usuario);
+  auditoriaService.registrar({
+    usuario: { id: registro.id, usuario: registro.usuario },
+    accion: ACCIONES.LOGIN_EXITOSO,
+    entidad: 'usuario',
+    entidadId: registro.id,
+    detalle: `Inicio de sesión exitoso para "${registro.usuario}".`,
+    ip,
+  });
   return {
     exito: true,
     usuario: { id: registro.id, usuario: registro.usuario },

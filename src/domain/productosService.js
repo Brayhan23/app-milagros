@@ -1,4 +1,6 @@
 const productosRepo = require('../data/productosRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 function normalizarTexto(valor) {
   if (typeof valor !== 'string') return valor;
@@ -64,7 +66,7 @@ function generarAdvertencias({ precioCompra, precioDetal, precioMayor }) {
   return advertencias;
 }
 
-function crearProducto(datos = {}) {
+function crearProducto(datos = {}, usuario = null) {
   const nombre = normalizarTexto(datos.nombre);
   const descripcion = normalizarTexto(datos.descripcion);
   const codigoBarras = normalizarTexto(datos.codigoBarras);
@@ -106,6 +108,14 @@ function crearProducto(datos = {}) {
     stockMinimo,
   });
 
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.PRODUCTO_CREADO,
+    entidad: 'producto',
+    entidadId: producto.id,
+    detalle: `Producto "${producto.nombre}" creado (precio detal $${precioDetal.toLocaleString('es-CO')}, precio mayor $${precioMayor.toLocaleString('es-CO')}, stock inicial ${stockActual}).`,
+  });
+
   return { exito: true, producto, advertencias: generarAdvertencias({ precioCompra, precioDetal, precioMayor }) };
 }
 
@@ -121,7 +131,7 @@ function buscarPorCodigoBarras(codigoBarras) {
   return { exito: true, producto };
 }
 
-function actualizarProducto(id, datos = {}) {
+function actualizarProducto(id, datos = {}, usuario = null) {
   const actual = productosRepo.buscarPorId(id);
   if (!actual) {
     return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
@@ -166,15 +176,109 @@ function actualizarProducto(id, datos = {}) {
     stockMinimo,
   });
 
+  const resumen = auditoriaService.resumirCambios(
+    {
+      nombre: actual.nombre,
+      descripcion: actual.descripcion,
+      codigo_barras: actual.codigo_barras,
+      precio_compra: actual.precio_compra,
+      precio_detal: actual.precio_detal,
+      precio_mayor: actual.precio_mayor,
+      stock_minimo: actual.stock_minimo,
+    },
+    {
+      nombre,
+      descripcion,
+      codigo_barras: codigoBarras,
+      precio_compra: precioCompra,
+      precio_detal: precioDetal,
+      precio_mayor: precioMayor,
+      stock_minimo: stockMinimo,
+    },
+    ['nombre', 'descripcion', 'codigo_barras', 'precio_compra', 'precio_detal', 'precio_mayor', 'stock_minimo']
+  );
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.PRODUCTO_ACTUALIZADO,
+    entidad: 'producto',
+    entidadId: id,
+    detalle: `Producto "${producto.nombre}" (id ${id}) actualizado: ${resumen}.`,
+  });
+
   return { exito: true, producto, advertencias: generarAdvertencias({ precioCompra, precioDetal, precioMayor }) };
 }
 
-function desactivarProducto(id) {
+function desactivarProducto(id, usuario = null) {
   const actual = productosRepo.buscarPorId(id);
   if (!actual) {
     return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
   }
-  return { exito: true, producto: productosRepo.desactivar(id) };
+
+  const producto = productosRepo.desactivar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.PRODUCTO_DESACTIVADO,
+    entidad: 'producto',
+    entidadId: id,
+    detalle: `Producto "${actual.nombre}" (id ${id}) desactivado.`,
+  });
+
+  return { exito: true, producto };
+}
+
+// --- Nuevas funciones de Dominio para HU-03, HU-04 y HU-05 ---
+
+// HU-03: Actualizar stock por ingreso de productos
+function ingresarStock(id, cantidad, usuario = null) {
+  const producto = productosRepo.buscarPorId(id);
+  if (!producto) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
+  }
+
+  const cantidadEntera = aEntero(cantidad);
+  if (!Number.isInteger(cantidadEntera) || cantidadEntera <= 0) {
+    return {
+      exito: false,
+      error: 'cantidad_invalida',
+      mensaje: 'La cantidad a ingresar debe ser un número entero mayor a cero.',
+    };
+  }
+
+  const productoActualizado = productosRepo.actualizarStock(id, cantidadEntera);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.STOCK_INGRESADO,
+    entidad: 'producto',
+    entidadId: id,
+    detalle: `Ingreso de stock: +${cantidadEntera} unidades de "${producto.nombre}" (stock resultante: ${productoActualizado.stock_actual}).`,
+  });
+
+  return {
+    exito: true,
+    producto: productoActualizado,
+    bajoStock: productoActualizado.stock_actual <= productoActualizado.stock_minimo,
+  };
+}
+
+// HU-04: Consultar productos con alerta de stock bajo
+function obtenerAlertasStock() {
+  const productos = productosRepo.listarBajoStock();
+  return {
+    exito: true,
+    totalAlertas: productos.length,
+    productos,
+  };
+}
+
+// HU-05: Consultar stock disponible en tiempo real
+function consultarStockTiempoReal() {
+  const stock = productosRepo.obtenerStockEnTiempoReal();
+  return {
+    exito: true,
+    inventario: stock,
+  };
 }
 
 module.exports = {
@@ -183,4 +287,9 @@ module.exports = {
   buscarPorCodigoBarras,
   actualizarProducto,
   desactivarProducto,
+  // Nuevas exportaciones:
+  ingresarStock,
+  obtenerAlertasStock,
+  consultarStockTiempoReal,
 };
+
