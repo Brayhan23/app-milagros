@@ -116,3 +116,19 @@ Como usuario, quiero configurar los datos de la empresa (nombre, NIT, dirección
 - Configuración de IVA en la factura.
 - Modo sin conexión (offline).
 - Diseño de roles ampliable a futuro (aunque hoy solo existe un login general).
+
+---
+
+## Pendientes antes de entregar al cliente
+
+- [ ] Reemplazar usuario admin de pruebas por el usuario real del negocio
+- [ ] Configurar correo real del admin (para recuperación de contraseña)
+- [ ] Configurar datos reales de la empresa en configuracion_empresa (nombre, NIT, dirección, teléfono, correo, logo)
+- [ ] Configurar BACKUP_PATH apuntando a la carpeta real de Google Drive Desktop del cliente
+- [ ] Instalar Google Drive Desktop en el PC del cliente
+- [ ] Configurar SMTP con la cuenta de correo real del negocio (no la cuenta de pruebas del desarrollador)
+- [ ] Empaquetar la app como ejecutable (pkg/nexe) para no requerir Node.js instalado en el PC del cliente
+- [ ] Configurar inicio automático con Windows
+- [ ] Verificar backup real funcionando end-to-end en el PC del cliente, no solo en desarrollo
+- [ ] Borrar cualquier usuario, producto, cliente o venta de prueba antes de la entrega
+- [ ] Confirmar con el cliente el porcentaje de IVA aplicable a sus productos (si quedó configurable)

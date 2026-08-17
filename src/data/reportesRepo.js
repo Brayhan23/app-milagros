@@ -1,4 +1,5 @@
 const db = require('./db');
+const configuracionRepo = require('./configuracionRepo');
 
 // Colombia es UTC-5 fijo (sin horario de verano), pero las fechas se
 // guardan con datetime('now'), que SQLite escribe en UTC. Restar 5 horas a
@@ -65,6 +66,26 @@ function resumenVentasPorRango(desde, hasta) {
     )
     .get(DESPLAZAMIENTO_COLOMBIA, desde, hasta);
 
+  // IVA recaudado: puramente informativo, NO cambia totalFacturado ni
+  // ningún otro número de arriba — los precios ya incluyen IVA (decisión de
+  // diseño confirmada), así que "total facturado" sigue significando
+  // exactamente lo mismo que antes de esta historia. Esto solo desglosa
+  // cuánto de ese total ya cobrado corresponde a impuesto, usando la tasa
+  // vigente en CADA venta (columna ventas.iva_porcentaje) y, para ventas
+  // anteriores a esa columna (NULL), aproximando con la tasa actual del
+  // negocio — mismo criterio que gananciaAproximada arriba.
+  const tasaActual = configuracionRepo.obtener().iva_porcentaje;
+  const ivaFila = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(total - CAST(ROUND(total / (1.0 + COALESCE(iva_porcentaje, ?) / 100.0)) AS INTEGER)), 0)
+           AS iva_recaudado,
+         SUM(CASE WHEN iva_porcentaje IS NULL THEN 1 ELSE 0 END) AS ventas_iva_aproximado
+       FROM ventas
+       WHERE date(creado_en, ?) BETWEEN ? AND ?`
+    )
+    .get(tasaActual, DESPLAZAMIENTO_COLOMBIA, desde, hasta);
+
   return {
     cantidadVentas: resumen.cantidad_ventas,
     totalFacturado: resumen.total_facturado,
@@ -73,6 +94,8 @@ function resumenVentasPorRango(desde, hasta) {
     dineroRecibidoTotal: resumen.dinero_recibido_ventas + abonosFila.total,
     gananciaTotal: gananciaFila.ganancia_total,
     gananciaAproximada: gananciaFila.items_costo_aproximado > 0,
+    ivaRecaudado: ivaFila.iva_recaudado,
+    ivaAproximado: ivaFila.ventas_iva_aproximado > 0,
     porMetodoPago: porMetodo.map((fila) => ({
       metodoPago: fila.metodo_pago,
       cantidad: fila.cantidad,

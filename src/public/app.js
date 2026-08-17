@@ -643,6 +643,8 @@ function mostrarFactura(venta) {
   document.getElementById('factura-subtotal').textContent = `$${venta.subtotal.toLocaleString()}`;
   document.getElementById('factura-descuento').textContent = `$${venta.descuento.toLocaleString()}`;
   document.getElementById('factura-total').textContent = `$${venta.total.toLocaleString()}`;
+  document.getElementById('factura-iva-porcentaje').textContent = venta.ivaPorcentaje;
+  document.getElementById('factura-iva-monto').textContent = `$${venta.ivaMonto.toLocaleString()}`;
 
   document.getElementById('factura-items').innerHTML = venta.items
     .map(
@@ -907,6 +909,7 @@ async function cargarConfiguracion() {
       document.getElementById('config-telefono').value = configuracionActual.telefono || '';
       document.getElementById('config-correo').value = configuracionActual.correo || '';
       document.getElementById('config-logo').value = configuracionActual.logo_ruta || '';
+      document.getElementById('config-iva').value = configuracionActual.iva_porcentaje ?? '';
     }
   } catch (err) {
     configuracionActual = null;
@@ -948,6 +951,7 @@ formConfiguracion.addEventListener('submit', async (e) => {
     telefono: document.getElementById('config-telefono').value.trim() || null,
     correo: document.getElementById('config-correo').value.trim() || null,
     logoRuta: document.getElementById('config-logo').value.trim() || null,
+    ivaPorcentaje: Number(document.getElementById('config-iva').value),
   };
 
   try {

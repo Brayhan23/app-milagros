@@ -1,6 +1,7 @@
 const ventasRepo = require('../data/ventasRepo');
 const productosRepo = require('../data/productosRepo');
 const clientesRepo = require('../data/clientesRepo');
+const configuracionRepo = require('../data/configuracionRepo');
 const auditoriaService = require('./auditoriaService');
 const { ACCIONES } = auditoriaService;
 
@@ -32,6 +33,44 @@ function validarItems(items) {
   }
 
   return { exito: true };
+}
+
+// Decisión de diseño confirmada: los precios de producto YA incluyen IVA
+// (no se suma aparte al vender), así que subtotal/descuento/total no
+// cambian en absoluto por esta cuenta — es puramente un desglose informativo
+// de cuánto de un monto que YA incluye impuesto corresponde a ese impuesto.
+// Fórmula estándar para "desincluir" IVA de un total: base = total / (1 +
+// tasa/100). ivaMonto se calcula como el RESIDUO (total - base), no con su
+// propia fórmula redondeada aparte, para garantizar SIEMPRE que
+// baseGravable + ivaMonto === total exactamente (sin esto, dos redondeos
+// independientes podrían no sumar el total real, un bug clásico de reparto).
+//
+// Orden de operaciones con el descuento: el descuento ya se resta del
+// subtotal ANTES de este cálculo (ver más abajo, total = subtotal -
+// descuento, sin cambios). El desglose de IVA se calcula sobre ese TOTAL ya
+// descontado, no sobre el subtotal bruto — en la práctica esto reparte el
+// descuento proporcionalmente entre base gravable e IVA, que es como
+// funciona un descuento de mostrador sobre un precio que ya incluye
+// impuesto: reduce el precio final que paga el cliente, y el IVA mostrado
+// es el que corresponde a ESE precio final, no al precio de lista.
+function calcularDesgloseIva(total, ivaPorcentaje) {
+  const baseGravable = Math.round(total / (1 + ivaPorcentaje / 100));
+  const ivaMonto = total - baseGravable;
+  return { baseGravable, ivaMonto };
+}
+
+// Envuelve una venta (ya sea recién creada o leída de la BD) con el
+// desglose de IVA para mostrar en factura/correo. Si la venta es anterior a
+// esta historia (iva_porcentaje NULL, ver migración en db.js), se aproxima
+// con la tasa ACTUAL del negocio y se marca ivaAproximado — mismo patrón
+// que gananciaAproximada en reportesRepo.js: nunca se inventa un dato
+// histórico que no se guardó, pero tampoco se deja a la usuaria sin ver
+// nada en una factura vieja.
+function enriquecerConDesgloseIva(venta) {
+  const ivaAproximado = venta.iva_porcentaje === null || venta.iva_porcentaje === undefined;
+  const ivaPorcentaje = ivaAproximado ? configuracionRepo.obtener().iva_porcentaje : venta.iva_porcentaje;
+  const { baseGravable, ivaMonto } = calcularDesgloseIva(venta.total, ivaPorcentaje);
+  return { ...venta, ivaPorcentaje, baseGravable, ivaMonto, ivaAproximado };
 }
 
 function crearVenta(datos = {}, usuario = null) {
@@ -120,6 +159,10 @@ function crearVenta(datos = {}, usuario = null) {
   }
 
   const total = subtotal - descuento;
+  // Tasa vigente AL MOMENTO de la venta: se guarda como "foto" en la propia
+  // venta (ver ventasRepo/schema.sql) para que un cambio futuro del % de IVA
+  // general del negocio no altere facturas ya emitidas.
+  const ivaPorcentaje = configuracionRepo.obtener().iva_porcentaje;
 
   const venta = ventasRepo.crear({
     tipoCliente,
@@ -128,6 +171,7 @@ function crearVenta(datos = {}, usuario = null) {
     descuento,
     subtotal,
     total,
+    ivaPorcentaje,
     items: itemsProcesados,
   });
 
@@ -139,7 +183,7 @@ function crearVenta(datos = {}, usuario = null) {
     detalle: `Venta #${venta.id} por $${total.toLocaleString('es-CO')} (${metodoPago}, ${tipoCliente}), ${itemsProcesados.length} producto(s).`,
   });
 
-  return { exito: true, venta };
+  return { exito: true, venta: enriquecerConDesgloseIva(venta) };
 }
 
 function obtenerVenta(id) {
@@ -147,11 +191,11 @@ function obtenerVenta(id) {
   if (!venta) {
     return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró la venta.' };
   }
-  return { exito: true, venta };
+  return { exito: true, venta: enriquecerConDesgloseIva(venta) };
 }
 
 function listarVentas() {
-  return { exito: true, ventas: ventasRepo.listar() };
+  return { exito: true, ventas: ventasRepo.listar().map(enriquecerConDesgloseIva) };
 }
 
 module.exports = { crearVenta, obtenerVenta, listarVentas };
