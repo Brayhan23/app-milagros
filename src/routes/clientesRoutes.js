@@ -22,7 +22,7 @@ function parsearId(valor) {
 }
 
 router.post('/clientes', (req, res) => {
-  const resultado = clientesService.crearCliente(req.body || {});
+  const resultado = clientesService.crearCliente(req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.status(201).json({ exito: true, cliente: resultado.cliente });
 });
@@ -69,7 +69,7 @@ router.put('/clientes/:id', (req, res) => {
     return res.status(400).json({ exito: false, mensaje: 'El id del cliente debe ser un número entero.' });
   }
 
-  const resultado = clientesService.actualizarCliente(id, req.body || {});
+  const resultado = clientesService.actualizarCliente(id, req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, cliente: resultado.cliente });
 });

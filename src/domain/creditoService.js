@@ -1,5 +1,7 @@
 const clientesRepo = require('../data/clientesRepo');
 const deudasRepo = require('../data/deudasRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 // HU-13: criterio de mora acordado con la usuaria.
 const DIAS_LIMITE_MORA = 30;
@@ -12,7 +14,7 @@ function aEntero(valor) {
   return NaN;
 }
 
-function registrarAbono(datos = {}) {
+function registrarAbono(datos = {}, usuario = null) {
   const ventaId = aEntero(datos.ventaId);
   const monto = aEntero(datos.monto);
 
@@ -47,6 +49,14 @@ function registrarAbono(datos = {}) {
 
   const abono = deudasRepo.registrarAbono(ventaId, monto);
   const ventaActualizada = deudasRepo.saldoDeVenta(ventaId);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.ABONO_REGISTRADO,
+    entidad: 'venta',
+    entidadId: ventaId,
+    detalle: `Abono de $${monto.toLocaleString('es-CO')} sobre la venta #${ventaId}. Saldo restante: $${ventaActualizada.saldo.toLocaleString('es-CO')}.`,
+  });
 
   return { exito: true, abono, saldoRestante: ventaActualizada.saldo };
 }

@@ -37,7 +37,7 @@ function parsearId(valor) {
 }
 
 router.post('/ventas', (req, res) => {
-  const resultado = ventasService.crearVenta(req.body || {});
+  const resultado = ventasService.crearVenta(req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.status(201).json({ exito: true, venta: resultado.venta });
 });
@@ -80,7 +80,7 @@ router.post('/ventas/:id/abonos', (req, res) => {
   }
 
   const { monto } = req.body || {};
-  const resultado = creditoService.registrarAbono({ ventaId: id, monto });
+  const resultado = creditoService.registrarAbono({ ventaId: id, monto }, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
 
   return res.status(201).json(resultado);

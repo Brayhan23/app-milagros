@@ -23,7 +23,7 @@ function parsearId(valor) {
 }
 
 router.post('/productos', (req, res) => {
-  const resultado = productosService.crearProducto(req.body || {});
+  const resultado = productosService.crearProducto(req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.status(201).json({ exito: true, producto: resultado.producto, advertencias: resultado.advertencias });
 });
@@ -46,7 +46,7 @@ router.put('/productos/:id', (req, res) => {
     return res.status(400).json({ exito: false, mensaje: 'El id del producto debe ser un número entero.' });
   }
 
-  const resultado = productosService.actualizarProducto(id, req.body || {});
+  const resultado = productosService.actualizarProducto(id, req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, producto: resultado.producto, advertencias: resultado.advertencias });
 });
@@ -57,7 +57,7 @@ router.delete('/productos/:id', (req, res) => {
     return res.status(400).json({ exito: false, mensaje: 'El id del producto debe ser un número entero.' });
   }
 
-  const resultado = productosService.desactivarProducto(id);
+  const resultado = productosService.desactivarProducto(id, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, producto: resultado.producto });
 });
@@ -74,7 +74,7 @@ router.patch('/productos/:id/stock', (req, res) => {
   }
 
   const { cantidad } = req.body || {};
-  const resultado = productosService.ingresarStock(id, cantidad);
+  const resultado = productosService.ingresarStock(id, cantidad, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
 
   return res.json(resultado);

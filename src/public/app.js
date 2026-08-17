@@ -74,6 +74,11 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
     if (boton.dataset.tab === 'clientes') {
       cargarDeudores();
     }
+
+    if (boton.dataset.tab === 'auditoria') {
+      cargarAccionesAuditoria();
+      cargarAuditoria();
+    }
   });
 });
 
@@ -976,3 +981,85 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
     mensajeRanking.classList.add('error');
   }
 });
+
+// --- Registro de auditoría (solo lectura) ---
+
+// Popula el <select> de acciones con el catálogo real que expone el backend,
+// para no duplicar a mano la lista de códigos de acción en el frontend.
+async function cargarAccionesAuditoria() {
+  const selectAccion = document.getElementById('auditoria-accion');
+  if (selectAccion.dataset.cargado === 'true') return;
+
+  try {
+    const res = await fetch(`${API_URL}/auditoria/acciones`, { headers: obtenerHeaders() });
+    const data = await res.json();
+    if (!res.ok || !data.exito) return;
+
+    data.acciones.forEach((accion) => {
+      const opcion = document.createElement('option');
+      opcion.value = accion;
+      opcion.textContent = accion;
+      selectAccion.appendChild(opcion);
+    });
+    selectAccion.dataset.cargado = 'true';
+  } catch (err) {
+    // Sin catálogo el filtro "Todas" sigue funcionando; no es bloqueante.
+  }
+}
+
+document.getElementById('btn-auditoria').addEventListener('click', cargarAuditoria);
+
+async function cargarAuditoria() {
+  const mensajeAuditoria = document.getElementById('mensaje-auditoria');
+  const tablaAuditoria = document.getElementById('tabla-body-auditoria');
+  mensajeAuditoria.textContent = '';
+  mensajeAuditoria.className = 'mensaje';
+
+  const desde = document.getElementById('auditoria-desde').value;
+  const hasta = document.getElementById('auditoria-hasta').value;
+  const accion = document.getElementById('auditoria-accion').value;
+
+  const parametros = new URLSearchParams();
+  if (desde) parametros.set('desde', desde);
+  if (hasta) parametros.set('hasta', hasta);
+  if (accion) parametros.set('accion', accion);
+  const query = parametros.toString() ? `?${parametros.toString()}` : '';
+
+  tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
+
+  try {
+    const res = await fetch(`${API_URL}/auditoria${query}`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeAuditoria.textContent = data.mensaje || 'No se pudo consultar el registro de auditoría.';
+      mensajeAuditoria.classList.add('error');
+      tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Sin datos.</td></tr>';
+      return;
+    }
+
+    if (data.eventos.length === 0) {
+      tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">No hay eventos que coincidan con el filtro.</td></tr>';
+      return;
+    }
+
+    tablaAuditoria.innerHTML = data.eventos
+      .map(
+        (evento) => `
+        <tr>
+          <td>${evento.creado_en}</td>
+          <td>${evento.usuario}</td>
+          <td>${evento.accion}</td>
+          <td>${evento.entidad || ''}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
+          <td>${evento.detalle || ''}</td>
+          <td>${evento.ip || ''}</td>
+        </tr>
+      `
+      )
+      .join('');
+  } catch (err) {
+    mensajeAuditoria.textContent = 'Error de conexión al consultar el registro de auditoría.';
+    mensajeAuditoria.classList.add('error');
+    tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Sin datos.</td></tr>';
+  }
+}

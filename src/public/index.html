@@ -50,6 +50,7 @@
         <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
         <button type="button" class="tab-btn" data-tab="configuracion">⚙️ Configuración</button>
         <button type="button" class="tab-btn" data-tab="reportes">📊 Reportes</button>
+        <button type="button" class="tab-btn" data-tab="auditoria">🔍 Auditoría</button>
       </nav>
 
       <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
@@ -495,6 +496,53 @@
           </div>
         </section>
 
+      </div>
+
+      <!-- Pestaña: Auditoría (registro de auditoría, solo lectura) -->
+      <div id="tab-auditoria" class="tab-panel hidden">
+        <section class="card">
+          <h2>🔍 Registro de Auditoría</h2>
+          <p class="empty-state">Trazabilidad de acciones sensibles: quién hizo qué y cuándo. Solo lectura.</p>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="auditoria-desde">Desde</label>
+              <input type="date" id="auditoria-desde">
+            </div>
+            <div class="form-group">
+              <label for="auditoria-hasta">Hasta</label>
+              <input type="date" id="auditoria-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-auditoria" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="auditoria-accion">Acción</label>
+            <select id="auditoria-accion">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div id="mensaje-auditoria" class="mensaje"></div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Usuario</th>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Detalle</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-auditoria">
+                <tr>
+                  <td colspan="6" class="empty-state">Sin datos todavía.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
     </main>

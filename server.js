@@ -9,6 +9,7 @@ const ventasRoutes = require('./src/routes/ventasRoutes');
 const clientesRoutes = require('./src/routes/clientesRoutes');
 const configuracionRoutes = require('./src/routes/configuracionRoutes');
 const reportesRoutes = require('./src/routes/reportesRoutes');
+const auditoriaRoutes = require('./src/routes/auditoriaRoutes');
 const requiereSesion = require('./src/routes/middlewares/requiereSesion');
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api', requiereSesion, ventasRoutes);
 app.use('/api', requiereSesion, clientesRoutes);
 app.use('/api', requiereSesion, configuracionRoutes);
 app.use('/api', requiereSesion, reportesRoutes);
+app.use('/api', requiereSesion, auditoriaRoutes);
 app.use('/api', requiereSesion, backupRoutes);
 
 const PORT = process.env.PORT || 3000;
