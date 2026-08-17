@@ -10,6 +10,14 @@ function normalizarTexto(valor) {
   return limpio === '' ? null : limpio;
 }
 
+function aEntero(valor) {
+  if (typeof valor === 'number') return valor;
+  if (typeof valor === 'string' && valor.trim() !== '' && !Number.isNaN(Number(valor))) {
+    return Number(valor);
+  }
+  return NaN;
+}
+
 // La fila con id=1 la siembra schema.sql (INSERT OR IGNORE) apenas se crea
 // la tabla, así que en condiciones normales configuracionRepo.obtener()
 // siempre encuentra algo: no hace falta un valor por defecto de respaldo
@@ -31,6 +39,7 @@ function actualizarConfiguracion(datos = {}, usuario = null) {
   // src/public/uploads/, para que el navegador lo pueda servir como
   // /uploads/logo.png sin pasar por la API.
   const logoRuta = datos.logoRuta !== undefined ? normalizarTexto(datos.logoRuta) : actual.logo_ruta;
+  const ivaPorcentaje = datos.ivaPorcentaje !== undefined ? aEntero(datos.ivaPorcentaje) : actual.iva_porcentaje;
 
   if (!nombreEmpresa) {
     return { exito: false, error: 'nombre_requerido', mensaje: 'El nombre de la empresa es obligatorio.' };
@@ -40,7 +49,15 @@ function actualizarConfiguracion(datos = {}, usuario = null) {
     return { exito: false, error: 'correo_invalido', mensaje: 'El correo de la empresa no es válido.' };
   }
 
-  const configuracion = configuracionRepo.actualizar({ nombreEmpresa, nit, direccion, telefono, correo, logoRuta });
+  if (!Number.isInteger(ivaPorcentaje) || ivaPorcentaje < 0 || ivaPorcentaje > 100) {
+    return {
+      exito: false,
+      error: 'iva_invalido',
+      mensaje: 'El porcentaje de IVA debe ser un número entero entre 0 y 100.',
+    };
+  }
+
+  const configuracion = configuracionRepo.actualizar({ nombreEmpresa, nit, direccion, telefono, correo, logoRuta, ivaPorcentaje });
 
   const resumen = auditoriaService.resumirCambios(
     {
@@ -50,9 +67,10 @@ function actualizarConfiguracion(datos = {}, usuario = null) {
       telefono: actual.telefono,
       correo: actual.correo,
       logo_ruta: actual.logo_ruta,
+      iva_porcentaje: actual.iva_porcentaje,
     },
-    { nombre_empresa: nombreEmpresa, nit, direccion, telefono, correo, logo_ruta: logoRuta },
-    ['nombre_empresa', 'nit', 'direccion', 'telefono', 'correo', 'logo_ruta']
+    { nombre_empresa: nombreEmpresa, nit, direccion, telefono, correo, logo_ruta: logoRuta, iva_porcentaje: ivaPorcentaje },
+    ['nombre_empresa', 'nit', 'direccion', 'telefono', 'correo', 'logo_ruta', 'iva_porcentaje']
   );
   auditoriaService.registrar({
     usuario,

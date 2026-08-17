@@ -6,6 +6,7 @@ const router = express.Router();
 const ESTADO_POR_ERROR = {
   nombre_requerido: 400,
   correo_invalido: 400,
+  iva_invalido: 400,
 };
 
 function responderError(res, resultado) {

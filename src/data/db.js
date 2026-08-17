@@ -63,4 +63,20 @@ if (!columnaExiste('usuarios', 'correo')) {
   console.log('Migración aplicada: usuarios.correo agregada (recuperación de contraseña).');
 }
 
+// Requisito adicional (IVA en la factura). Dos columnas nuevas en tablas que
+// ya existían: el % general del negocio (con default 19, la tarifa general
+// colombiana, como punto de partida) y la "foto" por venta de qué tasa
+// estaba vigente al momento de vender. Mismo patrón guardado de siempre.
+if (!columnaExiste('configuracion_empresa', 'iva_porcentaje')) {
+  db.exec(
+    'ALTER TABLE configuracion_empresa ADD COLUMN iva_porcentaje INTEGER NOT NULL DEFAULT 19 CHECK (iva_porcentaje BETWEEN 0 AND 100)'
+  );
+  console.log('Migración aplicada: configuracion_empresa.iva_porcentaje agregada (IVA en factura).');
+}
+
+if (!columnaExiste('ventas', 'iva_porcentaje')) {
+  db.exec('ALTER TABLE ventas ADD COLUMN iva_porcentaje INTEGER CHECK (iva_porcentaje BETWEEN 0 AND 100)');
+  console.log('Migración aplicada: ventas.iva_porcentaje agregada (IVA en factura).');
+}
+
 module.exports = db;

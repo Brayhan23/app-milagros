@@ -68,6 +68,9 @@ function construirHtmlFactura(venta) {
         <p>Subtotal: <strong>${formatearPesos(venta.subtotal)}</strong></p>
         <p>Descuento: <strong>${formatearPesos(venta.descuento)}</strong></p>
         <p style="font-size:1.1em;">Total: <strong style="color:#c2185b;">${formatearPesos(venta.total)}</strong></p>
+        <p style="font-size:0.85em; color:#767676;">Incluye IVA (${venta.ivaPorcentaje}%): ${formatearPesos(venta.ivaMonto)}${
+    venta.ivaAproximado ? ' (aproximado, venta anterior a la configuración de IVA)' : ''
+  }</p>
       </div>
       <p style="margin-top:20px; font-size:0.8em; color:#767676;">
         Este comprobante no tiene validez como factura electrónica DIAN.

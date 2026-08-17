@@ -22,13 +22,13 @@ function listar() {
 // misma transacción que la venta y el descuento de stock sin necesidad de
 // un segundo INSERT — no hay forma de que quede una venta sin su deuda ni
 // al revés porque son la misma fila.
-const crear = db.transaction(({ tipoCliente, metodoPago, clienteId, descuento, subtotal, total, items }) => {
+const crear = db.transaction(({ tipoCliente, metodoPago, clienteId, descuento, subtotal, total, ivaPorcentaje, items }) => {
   const infoVenta = db
     .prepare(
-      `INSERT INTO ventas (tipo_cliente, metodo_pago, cliente_id, descuento, subtotal, total)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO ventas (tipo_cliente, metodo_pago, cliente_id, descuento, subtotal, total, iva_porcentaje)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(tipoCliente, metodoPago, clienteId, descuento, subtotal, total);
+    .run(tipoCliente, metodoPago, clienteId, descuento, subtotal, total, ivaPorcentaje);
 
   const ventaId = infoVenta.lastInsertRowid;
 

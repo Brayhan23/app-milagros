@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS ventas (
   descuento INTEGER NOT NULL DEFAULT 0 CHECK (descuento >= 0),
   subtotal INTEGER NOT NULL CHECK (subtotal >= 0),
   total INTEGER NOT NULL CHECK (total >= 0),
+  -- Requisito adicional (IVA): "foto" del configuracion_empresa.iva_porcentaje
+  -- vigente al momento de la venta — mismo criterio que
+  -- venta_items.precio_compra_unitario: si el % de IVA del negocio cambia
+  -- después, las facturas ya emitidas no deben recalcularse con la tasa
+  -- nueva. Nullable porque las ventas ya existentes antes de esta historia
+  -- nunca capturaron este dato; ventasService lo aproxima con la tasa
+  -- ACTUAL de configuracion_empresa para esos casos y lo marca como
+  -- aproximado (mismo patrón que gananciaAproximada en reportesRepo.js).
+  -- Decisión de diseño confirmada: el precio de cada producto YA incluye el
+  -- IVA (precio_detal/precio_mayor no cambian), así que este campo es
+  -- puramente informativo para desglosar la factura — nunca altera
+  -- subtotal/descuento/total, que se calculan exactamente igual que antes.
+  iva_porcentaje INTEGER CHECK (iva_porcentaje BETWEEN 0 AND 100),
   creado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -209,6 +222,17 @@ CREATE TABLE IF NOT EXISTS configuracion_empresa (
   telefono TEXT,
   correo TEXT,
   logo_ruta TEXT,
+  -- Requisito adicional (IVA en la factura). Un solo % general para todo el
+  -- negocio (no por producto): coincide con que "Configuración de IVA en la
+  -- factura" está listado como una configuración general del negocio, y con
+  -- el patrón de fila única que ya usa esta tabla. Entero (no REAL) por la
+  -- misma razón que el resto de la app evita punto flotante; las tarifas de
+  -- IVA colombianas son porcentajes enteros (19%, 5%, 0%). Default 19 (tarifa
+  -- general vigente en Colombia) solo como punto de partida razonable — debe
+  -- confirmarse con la usuaria antes de entregar (ver checklist de
+  -- despliegue). Los precios de producto YA incluyen este IVA: no se suma
+  -- aparte al vender, ver comentario en ventas.iva_porcentaje.
+  iva_porcentaje INTEGER NOT NULL DEFAULT 19 CHECK (iva_porcentaje BETWEEN 0 AND 100),
   actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
