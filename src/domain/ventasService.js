@@ -103,6 +103,10 @@ function crearVenta(datos = {}) {
       nombreProducto: producto.nombre,
       cantidad,
       precioUnitario,
+      // HU-14: "foto" del costo al momento de la venta, mismo criterio que
+      // nombre_producto/precioUnitario — así la ganancia reportada después
+      // no cambia si el precio de compra del producto se edita más tarde.
+      precioCompraUnitario: producto.precio_compra,
       subtotal: precioUnitario * cantidad,
     };
   });

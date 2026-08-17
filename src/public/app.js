@@ -644,24 +644,30 @@ async function cargarDeudores() {
     const data = await res.json();
 
     if (!data.exito || !data.clientes || data.clientes.length === 0) {
-      tablaBodyDeudores.innerHTML = `<tr><td colspan="4" class="empty-state">No hay clientes con deuda pendiente.</td></tr>`;
+      tablaBodyDeudores.innerHTML = `<tr><td colspan="5" class="empty-state">No hay clientes con deuda pendiente.</td></tr>`;
       return;
     }
 
+    // HU-13: fila resaltada + insignia cuando la deuda más vieja del
+    // cliente supera los 30 días (en_mora ya viene calculado del backend).
     tablaBodyDeudores.innerHTML = data.clientes
       .map(
         (c) => `
-        <tr>
+        <tr class="${c.en_mora ? 'fila-mora' : ''}">
           <td>${c.id}</td>
           <td>${c.nombre}</td>
           <td>${c.documento || '—'}</td>
           <td>$${c.saldo_total.toLocaleString()}</td>
+          <td>
+            ${c.dias_deuda_mas_vieja} día(s)
+            ${c.en_mora ? '<span class="badge badge-low">⚠️ En mora</span>' : ''}
+          </td>
         </tr>
       `
       )
       .join('');
   } catch (err) {
-    tablaBodyDeudores.innerHTML = `<tr><td colspan="4" class="empty-state">Error al cargar los deudores.</td></tr>`;
+    tablaBodyDeudores.innerHTML = `<tr><td colspan="5" class="empty-state">Error al cargar los deudores.</td></tr>`;
   }
 }
 
@@ -834,5 +840,139 @@ formConfiguracion.addEventListener('submit', async (e) => {
   } catch (err) {
     mensajeConfiguracion.textContent = 'Error de conexión al guardar la configuración.';
     mensajeConfiguracion.classList.add('error');
+  }
+});
+
+// --- HU-14, HU-15, HU-16: REPORTES ---
+
+// Mismo resumen (ventas, facturado, recibido, ganancia, desglose por
+// método) para HU-14 y HU-15: la única diferencia es qué rango de fechas
+// se consultó, así que comparten este único renderizador.
+function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
+  const filasMetodo = resumen.porMetodoPago
+    .map(
+      (m) => `
+      <li>
+        ${ETIQUETA_METODO_PAGO[m.metodoPago] || m.metodoPago}:
+        ${m.cantidad} venta(s), facturado $${m.totalFacturado.toLocaleString()},
+        recibido $${m.dineroRecibido.toLocaleString()}
+      </li>`
+    )
+    .join('');
+
+  contenedor.innerHTML = `
+    ${encabezado}
+    <p>Ventas: <strong>${resumen.cantidadVentas}</strong></p>
+    <p>Total facturado: <strong>$${resumen.totalFacturado.toLocaleString()}</strong></p>
+    <p>Dinero recibido en ventas (efectivo/transferencia): <strong>$${resumen.dineroRecibidoVentas.toLocaleString()}</strong></p>
+    <p>Abonos recibidos (pagos de ventas a crédito): <strong>$${resumen.abonosRecibidos.toLocaleString()}</strong></p>
+    <p>Dinero total recibido en caja: <strong>$${resumen.dineroRecibidoTotal.toLocaleString()}</strong></p>
+    <p>Ganancia: <strong>$${resumen.gananciaTotal.toLocaleString()}</strong>${
+    resumen.gananciaAproximada
+      ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
+      : ''
+  }</p>
+    <p><strong>Desglose por método de pago:</strong></p>
+    <ul>${filasMetodo || '<li class="empty-state">Sin ventas en este rango.</li>'}</ul>
+  `;
+}
+
+// HU-14: ventas y ganancia del día (calendario colombiano, lo resuelve el backend).
+document.getElementById('btn-ventas-hoy').addEventListener('click', async () => {
+  const contenedor = document.getElementById('resumen-ventas-hoy');
+  contenedor.innerHTML = '<p class="empty-state">Cargando...</p>';
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/ventas-dia`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      contenedor.innerHTML = `<p class="empty-state">${data.mensaje || 'No se pudo cargar el reporte.'}</p>`;
+      return;
+    }
+
+    renderizarResumenReporte(contenedor, data, `<p>Fecha (Colombia): <strong>${data.fecha}</strong></p>`);
+  } catch (err) {
+    contenedor.innerHTML = '<p class="empty-state">Error de conexión al cargar el reporte.</p>';
+  }
+});
+
+// HU-15: mismo resumen, para un rango de fechas elegido por la usuaria.
+document.getElementById('btn-historico').addEventListener('click', async () => {
+  const mensajeHistorico = document.getElementById('mensaje-historico');
+  const contenedor = document.getElementById('resumen-historico');
+  mensajeHistorico.textContent = '';
+  mensajeHistorico.className = 'mensaje';
+
+  const desde = document.getElementById('historico-desde').value;
+  const hasta = document.getElementById('historico-hasta').value;
+
+  if (!desde || !hasta) {
+    mensajeHistorico.textContent = 'Elegí ambas fechas (desde y hasta).';
+    mensajeHistorico.classList.add('error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/historico?desde=${desde}&hasta=${hasta}`, {
+      headers: obtenerHeaders(),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeHistorico.textContent = data.mensaje || 'No se pudo consultar el histórico.';
+      mensajeHistorico.classList.add('error');
+      return;
+    }
+
+    renderizarResumenReporte(contenedor, data, `<p>Rango: <strong>${data.desde}</strong> a <strong>${data.hasta}</strong></p>`);
+  } catch (err) {
+    mensajeHistorico.textContent = 'Error de conexión al consultar el histórico.';
+    mensajeHistorico.classList.add('error');
+  }
+});
+
+// HU-16: ranking de productos más vendidos, con rango de fechas opcional.
+document.getElementById('btn-ranking').addEventListener('click', async () => {
+  const mensajeRanking = document.getElementById('mensaje-ranking');
+  const tablaRanking = document.getElementById('tabla-body-ranking');
+  mensajeRanking.textContent = '';
+  mensajeRanking.className = 'mensaje';
+
+  const desde = document.getElementById('ranking-desde').value;
+  const hasta = document.getElementById('ranking-hasta').value;
+  const parametros = desde && hasta ? `?desde=${desde}&hasta=${hasta}` : '';
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/productos-mas-vendidos${parametros}`, {
+      headers: obtenerHeaders(),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeRanking.textContent = data.mensaje || 'No se pudo consultar el ranking.';
+      mensajeRanking.classList.add('error');
+      return;
+    }
+
+    if (data.productos.length === 0) {
+      tablaRanking.innerHTML = '<tr><td colspan="3" class="empty-state">No hay ventas registradas en este rango.</td></tr>';
+      return;
+    }
+
+    tablaRanking.innerHTML = data.productos
+      .map(
+        (p) => `
+        <tr>
+          <td>${p.nombre}</td>
+          <td>${p.unidades_vendidas}</td>
+          <td>$${p.ingreso_generado.toLocaleString()}</td>
+        </tr>
+      `
+      )
+      .join('');
+  } catch (err) {
+    mensajeRanking.textContent = 'Error de conexión al consultar el ranking.';
+    mensajeRanking.classList.add('error');
   }
 });

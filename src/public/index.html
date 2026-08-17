@@ -49,6 +49,7 @@
         <button type="button" class="tab-btn" data-tab="facturas">🧾 Facturas</button>
         <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
         <button type="button" class="tab-btn" data-tab="configuracion">⚙️ Configuración</button>
+        <button type="button" class="tab-btn" data-tab="reportes">📊 Reportes</button>
       </nav>
 
       <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
@@ -341,11 +342,12 @@
                   <th>Cliente</th>
                   <th>Documento</th>
                   <th>Saldo Pendiente</th>
+                  <th>Antigüedad</th>
                 </tr>
               </thead>
               <tbody id="tabla-body-deudores">
                 <tr>
-                  <td colspan="4" class="empty-state">Cargando deudores...</td>
+                  <td colspan="5" class="empty-state">Cargando deudores...</td>
                 </tr>
               </tbody>
             </table>
@@ -424,6 +426,75 @@
           </form>
           <div id="mensaje-configuracion" class="mensaje"></div>
         </section>
+      </div>
+
+      <!-- Pestaña: Reportes (HU-14, HU-15, HU-16) -->
+      <div id="tab-reportes" class="tab-panel hidden">
+
+        <!-- HU-14: Ventas y ganancia del día -->
+        <section class="card">
+          <div class="card-header">
+            <h2>📅 Ventas y Ganancia del Día (HU-14)</h2>
+            <button type="button" id="btn-ventas-hoy" class="btn btn-secondary">Cargar Hoy</button>
+          </div>
+          <div id="resumen-ventas-hoy" class="empty-state">Sin cargar todavía.</div>
+        </section>
+
+        <!-- HU-15: Histórico por rango de fechas -->
+        <section class="card">
+          <h2>📈 Histórico por Rango de Fechas (HU-15)</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="historico-desde">Desde</label>
+              <input type="date" id="historico-desde">
+            </div>
+            <div class="form-group">
+              <label for="historico-hasta">Hasta</label>
+              <input type="date" id="historico-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-historico" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="mensaje-historico" class="mensaje"></div>
+          <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
+        </section>
+
+        <!-- HU-16: Productos más vendidos -->
+        <section class="card">
+          <h2>🏆 Productos Más Vendidos (HU-16)</h2>
+          <div class="form-grid-3col">
+            <div class="form-group">
+              <label for="ranking-desde">Desde (opcional)</label>
+              <input type="date" id="ranking-desde">
+            </div>
+            <div class="form-group">
+              <label for="ranking-hasta">Hasta (opcional)</label>
+              <input type="date" id="ranking-hasta">
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-ranking" class="btn btn-secondary">Consultar</button>
+            </div>
+          </div>
+          <div id="mensaje-ranking" class="mensaje"></div>
+          <div class="table-responsive">
+            <table class="tabla-inventario">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Unidades Vendidas</th>
+                  <th>Ingreso Generado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-ranking">
+                <tr>
+                  <td colspan="3" class="empty-state">Sin datos todavía.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
       </div>
 
     </main>

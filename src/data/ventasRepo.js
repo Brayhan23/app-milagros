@@ -33,12 +33,21 @@ const crear = db.transaction(({ tipoCliente, metodoPago, clienteId, descuento, s
   const ventaId = infoVenta.lastInsertRowid;
 
   const insertarItem = db.prepare(
-    `INSERT INTO venta_items (venta_id, producto_id, nombre_producto, cantidad, precio_unitario, subtotal)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO venta_items
+      (venta_id, producto_id, nombre_producto, cantidad, precio_unitario, precio_compra_unitario, subtotal)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
 
   for (const item of items) {
-    insertarItem.run(ventaId, item.productoId, item.nombreProducto, item.cantidad, item.precioUnitario, item.subtotal);
+    insertarItem.run(
+      ventaId,
+      item.productoId,
+      item.nombreProducto,
+      item.cantidad,
+      item.precioUnitario,
+      item.precioCompraUnitario,
+      item.subtotal
+    );
     productosRepo.actualizarStock(item.productoId, -item.cantidad);
   }
 

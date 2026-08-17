@@ -44,4 +44,15 @@ if (!columnaExiste('ventas', 'cliente_id')) {
   console.log('Migración aplicada: ventas.cliente_id agregada (HU-11/HU-12/HU-13).');
 }
 
+// HU-14: mismo patrón que cliente_id arriba. venta_items.precio_compra_unitario
+// no existía antes de los reportes de ganancia; en una BD ya creada, el
+// CREATE TABLE IF NOT EXISTS de arriba no le agrega la columna a la tabla
+// existente. Queda NULL para las filas viejas (no hay forma de reconstruir
+// un costo histórico que nunca se guardó) — reportesRepo.js lo aproxima con
+// el precio_compra actual del producto para esos casos.
+if (!columnaExiste('venta_items', 'precio_compra_unitario')) {
+  db.exec('ALTER TABLE venta_items ADD COLUMN precio_compra_unitario INTEGER CHECK (precio_compra_unitario >= 0)');
+  console.log('Migración aplicada: venta_items.precio_compra_unitario agregada (HU-14).');
+}
+
 module.exports = db;

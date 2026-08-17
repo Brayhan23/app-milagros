@@ -83,6 +83,18 @@ CREATE TABLE IF NOT EXISTS ventas (
 -- nombre_producto y precio_unitario quedan como "foto" del momento de la
 -- venta: si el producto cambia de nombre o precio después, la factura ya
 -- emitida no se altera.
+--
+-- precio_compra_unitario es esa misma idea de "foto" aplicada al COSTO, no
+-- solo al precio de venta: se agregó con HU-14 al notar que la ganancia se
+-- calculaba contra productos.precio_compra ACTUAL, no el que tenía el
+-- producto el día de la venta. Si el costo de un producto cambia después
+-- (algo que PUT /productos/:id ya permite libremente), sin esta columna
+-- cualquier reporte de ganancia sobre ventas pasadas quedaría mal — el mismo
+-- problema que nombre_producto/precio_unitario ya resuelven para el precio
+-- de venta. Nullable porque las ventas ya registradas antes de este cambio
+-- nunca capturaron ese dato y no hay forma de reconstruirlo con certeza
+-- (ver migración en db.js); reportesRepo.js aproxima esos casos viejos con
+-- el precio_compra actual del producto y lo marca como aproximado.
 CREATE TABLE IF NOT EXISTS venta_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   venta_id INTEGER NOT NULL REFERENCES ventas(id),
@@ -90,6 +102,7 @@ CREATE TABLE IF NOT EXISTS venta_items (
   nombre_producto TEXT NOT NULL,
   cantidad INTEGER NOT NULL CHECK (cantidad > 0),
   precio_unitario INTEGER NOT NULL CHECK (precio_unitario >= 0),
+  precio_compra_unitario INTEGER CHECK (precio_compra_unitario >= 0),
   subtotal INTEGER NOT NULL CHECK (subtotal >= 0)
 );
 
