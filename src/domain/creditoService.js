@@ -1,6 +1,9 @@
 const clientesRepo = require('../data/clientesRepo');
 const deudasRepo = require('../data/deudasRepo');
 
+// HU-13: criterio de mora acordado con la usuaria.
+const DIAS_LIMITE_MORA = 30;
+
 function aEntero(valor) {
   if (typeof valor === 'number') return valor;
   if (typeof valor === 'string' && valor.trim() !== '' && !Number.isNaN(Number(valor))) {
@@ -62,7 +65,11 @@ function obtenerDeudaCliente(clienteId) {
 }
 
 function listarClientesConDeuda() {
-  return { exito: true, clientes: deudasRepo.listarClientesConDeuda() };
+  const clientes = deudasRepo.listarClientesConDeuda().map((cliente) => ({
+    ...cliente,
+    en_mora: cliente.dias_deuda_mas_vieja > DIAS_LIMITE_MORA,
+  }));
+  return { exito: true, clientes };
 }
 
 module.exports = { registrarAbono, obtenerDeudaCliente, listarClientesConDeuda };

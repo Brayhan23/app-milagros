@@ -125,6 +125,10 @@ body {
 .badge-ok { background: var(--exito-fondo); color: var(--exito); }
 .badge-low { background: var(--error-fondo); color: var(--error); }
 
+/* Deudas en mora (HU-13) */
+.tabla-inventario tr.fila-mora { background: var(--error-fondo); }
+.tabla-inventario tr.fila-mora:hover { background: #fbdedb; }
+
 /* Pestañas del panel */
 .tabs {
   display: flex;

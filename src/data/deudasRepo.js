@@ -51,21 +51,32 @@ function abonosDeCliente(clienteId) {
     .all(clienteId);
 }
 
-// HU-13: clientes con saldo pendiente > 0, con cuánto debe cada uno.
+// HU-13: clientes con saldo pendiente > 0, con cuánto debe cada uno y hace
+// cuántos días viene pendiente su deuda más vieja (para la alerta de mora).
 // El saldo de cada venta se calcula en la CTE (una fila por venta, ya neta
 // de sus abonos) ANTES de agrupar por cliente — así se evita el clásico bug
 // de "fan-out" de hacer JOIN ventas-abonos y agrupar directo: eso multiplica
 // v.total una vez por cada abono que tenga esa venta y corrompe la suma.
+//
+// dias_deuda_mas_vieja usa julianday('now') - julianday(MIN(...)) en vez de
+// convertir a hora colombiana como hace reportesRepo.js: acá no importa,
+// porque es una RESTA de dos marcas de tiempo (duración), no una
+// clasificación de "a qué día calendario pertenece" — restarle el mismo
+// desplazamiento fijo a ambos lados de una resta no cambia el resultado, así
+// que el ajuste de -5h se cancela solo y agregarlo sería ruido sin efecto.
 function listarClientesConDeuda() {
   return db
     .prepare(
       `WITH saldos AS (
-         SELECT v.id AS venta_id, v.cliente_id,
+         SELECT v.id AS venta_id, v.cliente_id, v.creado_en,
                 v.total - COALESCE((SELECT SUM(a.monto) FROM abonos a WHERE a.venta_id = v.id), 0) AS saldo
          FROM ventas v
          WHERE v.metodo_pago = 'credito'
        )
-       SELECT c.id, c.nombre, c.documento, c.telefono, c.correo, SUM(s.saldo) AS saldo_total
+       SELECT c.id, c.nombre, c.documento, c.telefono, c.correo,
+              SUM(s.saldo) AS saldo_total,
+              MIN(s.creado_en) AS venta_mas_vieja_pendiente,
+              CAST(julianday('now') - julianday(MIN(s.creado_en)) AS INTEGER) AS dias_deuda_mas_vieja
        FROM saldos s
        JOIN clientes c ON c.id = s.cliente_id
        WHERE s.saldo > 0
