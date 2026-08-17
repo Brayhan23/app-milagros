@@ -1099,6 +1099,57 @@ document.getElementById('btn-historico').addEventListener('click', async () => {
   }
 });
 
+// Exportación del reporte histórico a Excel/PDF: reutiliza las mismas
+// fechas Desde/Hasta del formulario de arriba. Es una descarga de archivo
+// protegida por sesión, así que no puede ser un <a href> normal (el
+// navegador no manda el header Authorization en una navegación); se pide
+// con fetch + Authorization y se dispara la descarga con un <a> temporal
+// apuntando a un blob: URL.
+async function exportarReporteHistorico(formato) {
+  const mensajeExportar = document.getElementById('mensaje-exportar');
+  mensajeExportar.textContent = '';
+  mensajeExportar.className = 'mensaje';
+
+  const desde = document.getElementById('historico-desde').value;
+  const hasta = document.getElementById('historico-hasta').value;
+
+  if (!desde || !hasta) {
+    mensajeExportar.textContent = 'Elegí ambas fechas (desde y hasta) para exportar.';
+    mensajeExportar.classList.add('error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/reportes/exportar/${formato}?desde=${desde}&hasta=${hasta}`, {
+      headers: obtenerHeaders(),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      mensajeExportar.textContent = (data && data.mensaje) || 'No se pudo exportar el reporte.';
+      mensajeExportar.classList.add('error');
+      return;
+    }
+
+    const blob = await res.blob();
+    const extension = formato === 'excel' ? 'xlsx' : 'pdf';
+    const url = window.URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = `reporte-ventas_${desde}_a_${hasta}.${extension}`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    mensajeExportar.textContent = 'Error de conexión al exportar el reporte.';
+    mensajeExportar.classList.add('error');
+  }
+}
+
+document.getElementById('btn-exportar-excel').addEventListener('click', () => exportarReporteHistorico('excel'));
+document.getElementById('btn-exportar-pdf').addEventListener('click', () => exportarReporteHistorico('pdf'));
+
 // Listado de ventas individuales que componen un reporte (HU-14/HU-15):
 // misma tabla para ambos casos, con un botón "Ver factura" por fila que
 // reutiliza verFacturaCompleta() (la misma función que ya usa el detalle de
