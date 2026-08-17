@@ -198,4 +198,4 @@ function listarVentas() {
   return { exito: true, ventas: ventasRepo.listar().map(enriquecerConDesgloseIva) };
 }
 
-module.exports = { crearVenta, obtenerVenta, listarVentas };
+module.exports = { crearVenta, obtenerVenta, listarVentas, calcularDesgloseIva };

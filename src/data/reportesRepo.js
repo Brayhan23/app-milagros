@@ -133,11 +133,16 @@ function productosMasVendidos({ desde, hasta } = {}) {
 // LEFT JOIN clientes: "muchas ventas -> un cliente", mismo tipo de JOIN
 // "hacia arriba" que ya usa gananciaFila arriba (no hay fan-out); LEFT
 // porque cliente_id es nullable (venta de mostrador sin cliente asociado).
+// iva_porcentaje viaja tal cual (puede ser NULL en ventas viejas): quien
+// consuma esta fila decide cómo aproximarlo, igual que ya hace
+// ventasService.enriquecerConDesgloseIva con una venta individual —
+// exportacionService.js lo reutiliza para el detalle de venta por venta del
+// reporte exportado sin duplicar esa fórmula.
 function listarVentasPorRango(desde, hasta) {
   return db
     .prepare(
       `SELECT v.id, v.creado_en, v.tipo_cliente, v.metodo_pago, v.subtotal, v.descuento, v.total,
-              v.cliente_id, c.nombre AS nombre_cliente
+              v.cliente_id, c.nombre AS nombre_cliente, v.iva_porcentaje
        FROM ventas v
        LEFT JOIN clientes c ON c.id = v.cliente_id
        WHERE date(v.creado_en, ?) BETWEEN ? AND ?
