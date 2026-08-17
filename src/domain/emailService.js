@@ -129,4 +129,41 @@ async function enviarFacturaPorCorreo(ventaId, correoDestino) {
   }
 }
 
-module.exports = { enviarFacturaPorCorreo, construirHtmlFactura };
+// Envío genérico de un correo HTML simple, para flujos que no giran
+// alrededor de una venta (ej. el código de recuperación de contraseña).
+// Reutiliza el mismo transportador y las mismas variables de entorno SMTP
+// que enviarFacturaPorCorreo, para no duplicar esa configuración en dos
+// lugares del código.
+async function enviarCorreo({ destino, asunto, html }) {
+  if (!validarCorreo(destino)) {
+    return { exito: false, error: 'correo_invalido', mensaje: 'El correo del destinatario no es válido.' };
+  }
+
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return {
+      exito: false,
+      error: 'smtp_no_configurado',
+      mensaje: 'El envío de correo no está configurado en el servidor. Contacta al administrador.',
+    };
+  }
+
+  try {
+    const transportador = crearTransportador();
+    await transportador.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: destino.trim(),
+      subject: asunto,
+      html,
+    });
+    return { exito: true };
+  } catch (error) {
+    console.error('Error al enviar correo:', error.message);
+    return {
+      exito: false,
+      error: 'envio_fallido',
+      mensaje: 'No se pudo enviar el correo. Intenta de nuevo más tarde.',
+    };
+  }
+}
+
+module.exports = { enviarFacturaPorCorreo, construirHtmlFactura, enviarCorreo };

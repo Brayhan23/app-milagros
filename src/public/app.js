@@ -118,6 +118,131 @@ formLogin.addEventListener('submit', async (e) => {
   }
 });
 
+// --- Recuperación de contraseña ---
+
+const vistaRecuperarSolicitar = document.getElementById('vista-recuperar-solicitar');
+const vistaRecuperarConfirmar = document.getElementById('vista-recuperar-confirmar');
+const formRecuperarSolicitar = document.getElementById('form-recuperar-solicitar');
+const formRecuperarConfirmar = document.getElementById('form-recuperar-confirmar');
+const mensajeRecuperarSolicitar = document.getElementById('mensaje-recuperar-solicitar');
+const mensajeRecuperarConfirmar = document.getElementById('mensaje-recuperar-confirmar');
+
+// Identificador (usuario o correo) que se usó para pedir el código: se
+// reutiliza al confirmar, así el paso 2 no le vuelve a pedir ese dato a la
+// usuaria.
+let identificadorRecuperacion = '';
+
+const tarjetaLogin = document.getElementById('tarjeta-login');
+
+function mostrarVistaLogin() {
+  tarjetaLogin.classList.remove('hidden');
+  vistaRecuperarSolicitar.classList.add('hidden');
+  vistaRecuperarConfirmar.classList.add('hidden');
+}
+
+function mostrarVistaRecuperarSolicitar() {
+  tarjetaLogin.classList.add('hidden');
+  vistaRecuperarSolicitar.classList.remove('hidden');
+  vistaRecuperarConfirmar.classList.add('hidden');
+  mensajeRecuperarSolicitar.textContent = '';
+  mensajeRecuperarSolicitar.className = 'mensaje';
+}
+
+function mostrarVistaRecuperarConfirmar() {
+  vistaRecuperarSolicitar.classList.add('hidden');
+  vistaRecuperarConfirmar.classList.remove('hidden');
+  mensajeRecuperarConfirmar.textContent = '';
+  mensajeRecuperarConfirmar.className = 'mensaje';
+}
+
+document.getElementById('link-olvide-password').addEventListener('click', (e) => {
+  e.preventDefault();
+  mostrarVistaRecuperarSolicitar();
+});
+
+document.getElementById('link-volver-login-1').addEventListener('click', (e) => {
+  e.preventDefault();
+  mostrarVistaLogin();
+});
+
+document.getElementById('link-volver-login-2').addEventListener('click', (e) => {
+  e.preventDefault();
+  mostrarVistaLogin();
+});
+
+formRecuperarSolicitar.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensajeRecuperarSolicitar.textContent = '';
+  mensajeRecuperarSolicitar.className = 'mensaje';
+
+  const usuario = document.getElementById('recuperar-usuario').value.trim();
+
+  try {
+    const res = await fetch(`${API_URL}/auth/recuperar-solicitar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeRecuperarSolicitar.textContent = data.mensaje || 'No se pudo procesar la solicitud.';
+      mensajeRecuperarSolicitar.classList.add('error');
+      return;
+    }
+
+    identificadorRecuperacion = usuario;
+    formRecuperarConfirmar.reset();
+    mostrarVistaRecuperarConfirmar();
+    mensajeRecuperarConfirmar.textContent = data.mensaje;
+    mensajeRecuperarConfirmar.classList.add('exito');
+  } catch (err) {
+    mensajeRecuperarSolicitar.textContent = 'Error de conexión con el servidor.';
+    mensajeRecuperarSolicitar.classList.add('error');
+  }
+});
+
+formRecuperarConfirmar.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensajeRecuperarConfirmar.textContent = '';
+  mensajeRecuperarConfirmar.className = 'mensaje';
+
+  const codigo = document.getElementById('recuperar-codigo').value.trim();
+  const nuevaPassword = document.getElementById('recuperar-nueva-password').value;
+  const confirmarPassword = document.getElementById('recuperar-confirmar-password').value;
+
+  if (nuevaPassword !== confirmarPassword) {
+    mensajeRecuperarConfirmar.textContent = 'Las contraseñas no coinciden.';
+    mensajeRecuperarConfirmar.classList.add('error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/auth/recuperar-confirmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: identificadorRecuperacion, codigo, nuevaPassword }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mensajeRecuperarConfirmar.textContent = data.mensaje || 'No se pudo restablecer la contraseña.';
+      mensajeRecuperarConfirmar.classList.add('error');
+      return;
+    }
+
+    formRecuperarSolicitar.reset();
+    formRecuperarConfirmar.reset();
+    identificadorRecuperacion = '';
+    mostrarVistaLogin();
+    mensajeLogin.textContent = data.mensaje;
+    mensajeLogin.classList.add('exito');
+  } catch (err) {
+    mensajeRecuperarConfirmar.textContent = 'Error de conexión con el servidor.';
+    mensajeRecuperarConfirmar.classList.add('error');
+  }
+});
+
 btnLogout.addEventListener('click', () => {
   localStorage.removeItem('token');
   verificarSesion();

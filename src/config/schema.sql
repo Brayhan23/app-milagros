@@ -5,6 +5,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  -- Requisito adicional (recuperación de contraseña): correo al cual se
+  -- envía el código temporal de recuperación (ver recuperacionService.js).
+  -- Nullable porque usuarios ya existentes (ej. el admin creado antes de
+  -- esta historia) no tienen este dato todavía; sin correo configurado no
+  -- se puede enviar el código, así que solicitarRecuperacion() lo trata
+  -- igual que "usuario no encontrado" (mismo mensaje genérico), nunca con
+  -- un error distinto que delataría que el usuario existe pero le falta
+  -- el correo.
+  correo TEXT,
   creado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

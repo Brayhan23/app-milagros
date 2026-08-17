@@ -87,4 +87,10 @@ function login(usuario, password, ip = null) {
   };
 }
 
-module.exports = { login };
+// Expuesto para recuperacionService: tras un reseteo de contraseña exitoso
+// (la usuaria ya probó su identidad con el código enviado por correo), un
+// bloqueo por intentos fallidos previos a ese reseteo no debe seguir
+// vigente — si no se limpia acá, login() lo sigue rechazando durante los
+// próximos 5 minutos SIN IMPORTAR qué contraseña se use, ni la vieja ni la
+// nueva, porque estaBloqueado() se revisa antes de comparar la contraseña.
+module.exports = { login, limpiarBloqueoLogin: limpiarIntentos };

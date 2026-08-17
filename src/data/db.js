@@ -55,4 +55,12 @@ if (!columnaExiste('venta_items', 'precio_compra_unitario')) {
   console.log('Migración aplicada: venta_items.precio_compra_unitario agregada (HU-14).');
 }
 
+// Requisito adicional (recuperación de contraseña): usuarios ya creados
+// antes de esta historia (ej. el admin de scripts/crear-admin.js) no tienen
+// correo. Mismo patrón guardado que las migraciones anteriores.
+if (!columnaExiste('usuarios', 'correo')) {
+  db.exec('ALTER TABLE usuarios ADD COLUMN correo TEXT');
+  console.log('Migración aplicada: usuarios.correo agregada (recuperación de contraseña).');
+}
+
 module.exports = db;

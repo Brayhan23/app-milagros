@@ -10,7 +10,7 @@
 
   <!-- Vista: Login (HU-01) -->
   <div id="vista-login" class="login-container">
-    <div class="card login-card">
+    <div id="tarjeta-login" class="card login-card">
       <div class="header-login">
         <h1>Milagros</h1>
         <p>Iniciar Sesión</p>
@@ -27,6 +27,53 @@
         <button type="submit" class="btn btn-primary btn-full">Ingresar</button>
       </form>
       <div id="mensaje-login" class="mensaje"></div>
+      <a href="#" id="link-olvide-password" class="link-sutil">¿Olvidaste tu contraseña?</a>
+    </div>
+
+    <!-- Recuperación de contraseña, paso 1: pedir código -->
+    <!-- No es un enlace por correo con una página web propia: la app corre
+         en localhost del PC de la tienda y no es accesible desde el celular
+         ni desde internet. El código se pide y se ingresa en esta misma
+         pantalla, en el mismo computador. -->
+    <div id="vista-recuperar-solicitar" class="card login-card hidden">
+      <div class="header-login">
+        <h1>Recuperar contraseña</h1>
+        <p>Escribe tu usuario o correo registrado</p>
+      </div>
+      <form id="form-recuperar-solicitar">
+        <div class="form-group">
+          <label for="recuperar-usuario">Usuario o correo</label>
+          <input type="text" id="recuperar-usuario" placeholder="Usuario o correo" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Enviar código</button>
+      </form>
+      <div id="mensaje-recuperar-solicitar" class="mensaje"></div>
+      <a href="#" id="link-volver-login-1" class="link-sutil">Volver a iniciar sesión</a>
+    </div>
+
+    <!-- Recuperación de contraseña, paso 2: ingresar código + nueva contraseña -->
+    <div id="vista-recuperar-confirmar" class="card login-card hidden">
+      <div class="header-login">
+        <h1>Nueva contraseña</h1>
+        <p>Ingresa el código de 6 dígitos que enviamos a tu correo</p>
+      </div>
+      <form id="form-recuperar-confirmar">
+        <div class="form-group">
+          <label for="recuperar-codigo">Código de verificación</label>
+          <input type="text" id="recuperar-codigo" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" required>
+        </div>
+        <div class="form-group">
+          <label for="recuperar-nueva-password">Nueva contraseña</label>
+          <input type="password" id="recuperar-nueva-password" placeholder="Mínimo 8 caracteres" required>
+        </div>
+        <div class="form-group">
+          <label for="recuperar-confirmar-password">Confirmar contraseña</label>
+          <input type="password" id="recuperar-confirmar-password" placeholder="Repite la contraseña" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Restablecer contraseña</button>
+      </form>
+      <div id="mensaje-recuperar-confirmar" class="mensaje"></div>
+      <a href="#" id="link-volver-login-2" class="link-sutil">Volver a iniciar sesión</a>
     </div>
   </div>
 

@@ -16,6 +16,8 @@ const ACCIONES = Object.freeze({
   CLIENTE_CREADO: 'cliente_creado',
   CLIENTE_ACTUALIZADO: 'cliente_actualizado',
   CONFIGURACION_ACTUALIZADA: 'configuracion_actualizada',
+  RECUPERACION_SOLICITADA: 'recuperacion_solicitada',
+  RECUPERACION_COMPLETADA: 'recuperacion_completada',
 });
 
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;

@@ -225,6 +225,18 @@ body {
 
 .header-login h1 { color: var(--rosado-oscuro); }
 
+/* Recuperación de contraseña */
+.link-sutil {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: var(--rosado-oscuro);
+  text-decoration: none;
+  cursor: pointer;
+}
+.link-sutil:hover { text-decoration: underline; }
+
 /* Grillas de Formularios (HU-02 y HU-03) */
 .form-grid-2col {
   display: grid;
