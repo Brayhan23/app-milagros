@@ -6,6 +6,16 @@ const { ACCIONES } = auditoriaService;
 const MAX_INTENTOS_FALLIDOS = 5;
 const DURACION_BLOQUEO_MS = 5 * 60 * 1000; // 5 minutos
 
+// Hash "señuelo" fijo, generado una sola vez al cargar el módulo. Cuando el
+// usuario NO existe, se compara la contraseña recibida contra ESTE hash en
+// vez de saltarse bcrypt directamente — así ese camino consume un tiempo de
+// CPU similar al de comparar contra un hash real, y el tiempo de respuesta
+// deja de delatar si el usuario existe o no (timing side-channel: antes,
+// un usuario inexistente respondía casi instantáneo porque bcrypt.compareSync
+// solo corría cuando `registro` existía). El resultado de esta comparación
+// nunca importa: más abajo, `!registro` ya alcanza para rechazar el login.
+const HASH_SEÑUELO = bcrypt.hashSync('contraseña-señuelo-nunca-es-real', 12);
+
 // Estado de intentos en memoria: usuario -> { intentos, bloqueadoHasta }
 const intentosPorUsuario = new Map();
 
@@ -53,7 +63,7 @@ function login(usuario, password, ip = null) {
   }
 
   const registro = usuariosRepo.buscarPorUsuario(usuario);
-  const passwordValida = registro ? bcrypt.compareSync(password, registro.password_hash) : false;
+  const passwordValida = bcrypt.compareSync(password, registro ? registro.password_hash : HASH_SEÑUELO);
 
   if (!registro || !passwordValida) {
     registrarIntentoFallido(usuario);

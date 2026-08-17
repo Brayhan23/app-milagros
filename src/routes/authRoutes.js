@@ -2,6 +2,9 @@ const express = require('express');
 const authService = require('../domain/authService');
 const sesionService = require('../domain/sesionService');
 const recuperacionService = require('../domain/recuperacionService');
+const auditoriaService = require('../domain/auditoriaService');
+const { ACCIONES } = auditoriaService;
+const requiereSesion = require('./middlewares/requiereSesion');
 
 const router = express.Router();
 
@@ -22,6 +25,28 @@ router.post('/login', (req, res) => {
   const token = sesionService.crearSesion(resultado.usuario);
 
   return res.json({ exito: true, usuario: resultado.usuario, token });
+});
+
+// Logout del lado del servidor: invalida el token de inmediato en vez de
+// dejar que siga siendo válido hasta que expiren sus 12 horas. Protegida
+// por requiereSesion porque necesita saber CUÁL token invalidar (el de
+// quien está llamando) — no tendría sentido como ruta pública.
+router.post('/logout', requiereSesion, (req, res) => {
+  const encabezado = req.headers.authorization || '';
+  const [, token] = encabezado.split(' ');
+
+  sesionService.eliminarSesion(token);
+
+  auditoriaService.registrar({
+    usuario: req.usuario,
+    accion: ACCIONES.LOGOUT,
+    entidad: 'usuario',
+    entidadId: req.usuario.id,
+    detalle: `Cierre de sesión para "${req.usuario.usuario}".`,
+    ip: req.ip,
+  });
+
+  return res.json({ exito: true, mensaje: 'Sesión cerrada correctamente.' });
 });
 
 // Recuperación de contraseña: pública, igual que /login, porque quien la usa

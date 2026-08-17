@@ -41,4 +41,13 @@ function validarToken(token) {
   return { id: sesion.usuarioId, usuario: sesion.usuario };
 }
 
-module.exports = { crearSesion, validarToken };
+// Logout del lado del servidor: borra el token del Map para que deje de ser
+// válido de inmediato, en vez de esperar a que expiren sus 12 horas. Sin
+// esto, "cerrar sesión" solo borraba el token del navegador (localStorage)
+// pero el token seguía siendo aceptado por requiereSesion si alguien más lo
+// tenía (ej. copiado de un backup del navegador, o un PC compartido).
+function eliminarSesion(token) {
+  sesiones.delete(token);
+}
+
+module.exports = { crearSesion, validarToken, eliminarSesion };

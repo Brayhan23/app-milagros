@@ -2,7 +2,7 @@
 const bcrypt = require('bcrypt');
 const usuariosRepo = require('../src/data/usuariosRepo');
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 function main() {
   const [usuario, password] = process.argv.slice(2);

@@ -7,11 +7,13 @@
   uso), servido local vía `express.static`, sin Electron, sin framework ni build step:
   un único `index.html` con vistas/pestañas que se muestran u ocultan por JS
   (`app.js`, vanilla) + `styles.css`. Se conecta al backend por `fetch` a `/api/...`
-  (mismo origen). La "sesión" hoy es solo cosmética: el frontend guarda un string fijo
-  en `localStorage` tras un login exitoso y lo manda como `Authorization: Bearer ...`,
-  pero **ningún endpoint del backend valida ese header todavía** (no hay middleware de
-  auth) — no es protección real, pendiente de resolver antes de exponer esto fuera de
-  un entorno confiable.
+  (mismo origen). La sesión usa un token real: `sesionService.js` emite un UUID
+  (`crypto.randomUUID()`) al loguearse, el frontend lo guarda en `localStorage` y lo
+  manda como `Authorization: Bearer ...`. El middleware `requiereSesion.js` valida ese
+  token en cada ruta protegida bajo `/api` (montado en `server.js`); sin token válido,
+  responde 401. La sesión expira sola a las 12 horas o se puede cerrar antes desde el
+  servidor con `POST /api/auth/logout` (invalida el token en el acto, no solo lo borra
+  del navegador).
 - API bajo `/api` (`/api/auth/login`, `/api/productos`, `/api/ventas`), excepto
   `POST /backup`, que quedó montado en la raíz sin el prefijo (inconsistencia pendiente
   de corregir).

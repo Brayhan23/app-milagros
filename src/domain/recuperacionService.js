@@ -6,10 +6,23 @@ const emailService = require('./emailService');
 const auditoriaService = require('./auditoriaService');
 const { ACCIONES } = auditoriaService;
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 const DURACION_CODIGO_MS = 10 * 60 * 1000; // 10 minutos
 const MAX_INTENTOS_CODIGO = 5;
 const LONGITUD_CODIGO = 6;
+
+// Timing side-channel: cuando el usuario no existe (o no tiene correo), este
+// camino respondía casi instantáneo porque nunca llega a hacer la conexión
+// SMTP real; cuando sí existe, `emailService.enviarCorreo` espera una
+// conexión SMTP real (medido en este entorno: ~1.6-2.2s contra Gmail). Esa
+// diferencia de tiempo delata si el usuario existe aunque el mensaje de
+// respuesta sea idéntico. No hace falta que coincida exacto — alcanza con
+// que el camino "corto" ya no sea instantáneo comparado con el real.
+const DEMORA_ARTIFICIAL_MS = 1700;
+
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // El sistema no tenía ninguna regla de longitud mínima de contraseña
 // definida (ni en authService/login ni en scripts/crear-admin.js). Se fija
@@ -86,7 +99,9 @@ async function solicitarRecuperacion(identificador, ip = null) {
   if (!registro || !registro.correo) {
     // No hay a dónde enviar el código (usuario inexistente o sin correo
     // configurado): no se genera código ninguno, pero la respuesta es
-    // idéntica a la del caso exitoso.
+    // idéntica a la del caso exitoso — y ahora también tarda un tiempo
+    // similar, para no delatar por timing que este camino se saltó el envío.
+    await esperar(DEMORA_ARTIFICIAL_MS);
     return { exito: true, mensaje: MENSAJE_GENERICO };
   }
 

@@ -243,9 +243,20 @@ formRecuperarConfirmar.addEventListener('submit', async (e) => {
   }
 });
 
-btnLogout.addEventListener('click', () => {
-  localStorage.removeItem('token');
-  verificarSesion();
+btnLogout.addEventListener('click', async () => {
+  try {
+    // Invalida el token del lado del servidor antes de borrarlo del
+    // navegador: sin esto, "cerrar sesión" era solo cosmético y el token
+    // seguía siendo válido hasta sus 12 horas aunque ya no estuviera en
+    // localStorage.
+    await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: obtenerHeaders() });
+  } catch (err) {
+    // Si falla la llamada (ej. sin conexión), igual se cierra la sesión
+    // localmente: no tiene sentido dejar a la usuaria atrapada en el panel.
+  } finally {
+    localStorage.removeItem('token');
+    verificarSesion();
+  }
 });
 
 

@@ -28,8 +28,16 @@ app.use('/api', requiereSesion, auditoriaRoutes);
 app.use('/api', requiereSesion, backupRoutes);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+const HOST = '127.0.0.1';
+// La app es local-first: corre en el PC de la tienda y no debería ser
+// alcanzable desde otros equipos de la misma red. Sin fijar el host,
+// app.listen(PORT) escucha por defecto en todas las interfaces (0.0.0.0),
+// lo que la expone a cualquier dispositivo en la misma WiFi/LAN — más allá
+// de lo que asume el resto del proyecto ("solo localhost"). Atar el
+// servidor a 127.0.0.1 hace que solo procesos del propio PC puedan
+// conectarse.
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
   backupService.iniciarProgramacionBackup();
   auditoriaService.iniciarProgramacionPurga();
 });

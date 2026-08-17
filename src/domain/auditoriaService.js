@@ -15,6 +15,7 @@ const INTERVALO_CHEQUEO_MS = 60 * 60 * 1000; // 1 hora
 const ACCIONES = Object.freeze({
   LOGIN_EXITOSO: 'login_exitoso',
   LOGIN_FALLIDO: 'login_fallido',
+  LOGOUT: 'logout',
   VENTA_CREADA: 'venta_creada',
   ABONO_REGISTRADO: 'abono_registrado',
   PRODUCTO_CREADO: 'producto_creado',
