@@ -204,3 +204,59 @@ CREATE TABLE IF NOT EXISTS configuracion_empresa (
 );
 
 INSERT OR IGNORE INTO configuracion_empresa (id, nombre_empresa) VALUES (1, 'Milagros');
+
+-- Requisito adicional: registro de auditoría (trazabilidad de acciones
+-- sensibles: quién hizo qué, sobre qué, y cuándo).
+--
+-- Qué se guarda por evento, y por qué:
+-- - usuario_id (FK nullable) + usuario (TEXT, copia del nombre): mismo
+--   criterio "foto" que ya usan venta_items.nombre_producto y
+--   ventas.cliente_id — si el usuario se llegara a borrar en el futuro (hoy
+--   no hay ni endpoint para eso), el registro de auditoría no debe volverse
+--   ilegible ni perder el rastro de quién hizo la acción. usuario es NOT
+--   NULL porque siempre hay al menos un nombre intentando la acción, incluso
+--   en un login fallido con usuario inexistente (ahí usuario_id sí queda
+--   NULL, porque no hay fila real en `usuarios` a la cual apuntar).
+-- - accion (TEXT): un código corto y fijo (ej. 'venta_creada',
+--   'login_fallido') definido como constantes en auditoriaService.js, no
+--   texto libre — así los filtros por tipo de acción son exactos y no
+--   dependen de que el texto se haya escrito siempre igual.
+-- - entidad + entidad_id: sobre qué registro concreto actuó (ej. entidad
+--   'producto', entidad_id 7), para poder cruzar el evento con la tabla real
+--   si hace falta. Ambos nullable: un login no tiene una "entidad de
+--   negocio" asociada más que el propio usuario.
+-- - detalle (TEXT): un RESUMEN legible en una línea, no el objeto completo
+--   antes/después. Para creaciones basta describir lo creado; para
+--   ediciones, auditoriaService.resumirCambios() arma algo como
+--   "precio_detal: 12000 -> 13000" listando solo los campos que
+--   efectivamente cambiaron. Guardar el JSON completo del registro en cada
+--   evento infla la tabla sin agregar valor real de auditoría: lo que
+--   importa para "qué pasó" es qué cambió, no repetir campos que ya estaban
+--   en la fila original y no se tocaron.
+-- - ip (TEXT, nullable): se captura sobre todo para login (exitoso y
+--   fallido), que es el evento donde más importa poder distinguir un
+--   intento legítimo de uno indebido. Para el resto de acciones queda NULL
+--   si el llamador no la pasa: no vale la pena forzarla en todos lados
+--   cuando lo crítico para detectar acceso indebido es el login.
+-- - creado_en: mismo patrón datetime('now') que el resto de tablas (UTC);
+--   las consultas de auditoría filtran por fecha con el mismo ajuste de
+--   -5 horas que reportesRepo.js usa para clasificar "a qué día calendario
+--   colombiano" pertenece cada evento (ver auditoriaRepo.js).
+--
+-- Nunca se guardan contraseñas ni tokens de sesión en esta tabla, ni
+-- siquiera hasheados: el campo `detalle` de un login nunca debe construirse
+-- a partir de datos.password.
+CREATE TABLE IF NOT EXISTS auditoria (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  usuario TEXT NOT NULL,
+  accion TEXT NOT NULL,
+  entidad TEXT,
+  entidad_id INTEGER,
+  detalle TEXT,
+  ip TEXT,
+  creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_auditoria_creado_en ON auditoria(creado_en);
+CREATE INDEX IF NOT EXISTS idx_auditoria_accion ON auditoria(accion);

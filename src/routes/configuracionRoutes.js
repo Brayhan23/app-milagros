@@ -19,7 +19,7 @@ router.get('/configuracion', (req, res) => {
 });
 
 router.put('/configuracion', (req, res) => {
-  const resultado = configuracionService.actualizarConfiguracion(req.body || {});
+  const resultado = configuracionService.actualizarConfiguracion(req.body || {}, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json(resultado);
 });

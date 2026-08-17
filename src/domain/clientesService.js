@@ -1,4 +1,6 @@
 const clientesRepo = require('../data/clientesRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,7 +14,7 @@ function validarCorreo(correo) {
   return REGEX_CORREO.test(correo);
 }
 
-function crearCliente(datos = {}) {
+function crearCliente(datos = {}, usuario = null) {
   const nombre = normalizarTexto(datos.nombre);
   const documento = normalizarTexto(datos.documento);
   const telefono = normalizarTexto(datos.telefono);
@@ -39,6 +41,15 @@ function crearCliente(datos = {}) {
   }
 
   const cliente = clientesRepo.crear({ nombre, documento, telefono, correo, esMayorista });
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CLIENTE_CREADO,
+    entidad: 'cliente',
+    entidadId: cliente.id,
+    detalle: `Cliente "${cliente.nombre}" creado${esMayorista ? ' (mayorista)' : ''}.`,
+  });
+
   return { exito: true, cliente };
 }
 
@@ -54,7 +65,7 @@ function buscarClientePorId(id) {
   return { exito: true, cliente };
 }
 
-function actualizarCliente(id, datos = {}) {
+function actualizarCliente(id, datos = {}, usuario = null) {
   const actual = clientesRepo.buscarPorId(id);
   if (!actual) {
     return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el cliente.' };
@@ -86,6 +97,26 @@ function actualizarCliente(id, datos = {}) {
   }
 
   const cliente = clientesRepo.actualizar(id, { nombre, documento, telefono, correo, esMayorista });
+
+  const resumen = auditoriaService.resumirCambios(
+    {
+      nombre: actual.nombre,
+      documento: actual.documento,
+      telefono: actual.telefono,
+      correo: actual.correo,
+      es_mayorista: actual.es_mayorista ? 1 : 0,
+    },
+    { nombre, documento, telefono, correo, es_mayorista: esMayorista ? 1 : 0 },
+    ['nombre', 'documento', 'telefono', 'correo', 'es_mayorista']
+  );
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CLIENTE_ACTUALIZADO,
+    entidad: 'cliente',
+    entidadId: id,
+    detalle: `Cliente "${cliente.nombre}" (id ${id}) actualizado: ${resumen}.`,
+  });
+
   return { exito: true, cliente };
 }
 

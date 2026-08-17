@@ -1,6 +1,8 @@
 const ventasRepo = require('../data/ventasRepo');
 const productosRepo = require('../data/productosRepo');
 const clientesRepo = require('../data/clientesRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 const TIPOS_CLIENTE = ['detal', 'mayor'];
 const METODOS_PAGO = ['efectivo', 'transferencia', 'credito'];
@@ -32,7 +34,7 @@ function validarItems(items) {
   return { exito: true };
 }
 
-function crearVenta(datos = {}) {
+function crearVenta(datos = {}, usuario = null) {
   const tipoCliente = datos.tipoCliente;
   const metodoPago = datos.metodoPago;
   const descuento = datos.descuento !== undefined ? aEntero(datos.descuento) : 0;
@@ -127,6 +129,14 @@ function crearVenta(datos = {}) {
     subtotal,
     total,
     items: itemsProcesados,
+  });
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.VENTA_CREADA,
+    entidad: 'venta',
+    entidadId: venta.id,
+    detalle: `Venta #${venta.id} por $${total.toLocaleString('es-CO')} (${metodoPago}, ${tipoCliente}), ${itemsProcesados.length} producto(s).`,
   });
 
   return { exito: true, venta };

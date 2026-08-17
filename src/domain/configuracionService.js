@@ -1,4 +1,6 @@
 const configuracionRepo = require('../data/configuracionRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,7 +18,7 @@ function obtenerConfiguracion() {
   return { exito: true, configuracion: configuracionRepo.obtener() };
 }
 
-function actualizarConfiguracion(datos = {}) {
+function actualizarConfiguracion(datos = {}, usuario = null) {
   const actual = configuracionRepo.obtener();
 
   const nombreEmpresa = datos.nombreEmpresa !== undefined ? normalizarTexto(datos.nombreEmpresa) : actual.nombre_empresa;
@@ -39,6 +41,27 @@ function actualizarConfiguracion(datos = {}) {
   }
 
   const configuracion = configuracionRepo.actualizar({ nombreEmpresa, nit, direccion, telefono, correo, logoRuta });
+
+  const resumen = auditoriaService.resumirCambios(
+    {
+      nombre_empresa: actual.nombre_empresa,
+      nit: actual.nit,
+      direccion: actual.direccion,
+      telefono: actual.telefono,
+      correo: actual.correo,
+      logo_ruta: actual.logo_ruta,
+    },
+    { nombre_empresa: nombreEmpresa, nit, direccion, telefono, correo, logo_ruta: logoRuta },
+    ['nombre_empresa', 'nit', 'direccion', 'telefono', 'correo', 'logo_ruta']
+  );
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CONFIGURACION_ACTUALIZADA,
+    entidad: 'configuracion_empresa',
+    entidadId: 1,
+    detalle: `Configuración de la empresa actualizada: ${resumen}.`,
+  });
+
   return { exito: true, configuracion };
 }
 
