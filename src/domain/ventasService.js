@@ -24,10 +24,12 @@ function validarItems(items) {
   for (const item of items) {
     const productoId = aEntero(item.productoId);
     const cantidad = aEntero(item.cantidad);
-    if (!Number.isInteger(productoId)) {
+    // Number.isSafeInteger evita que un valor fuera del rango entero seguro
+    // (ej. 1e21) pase la validación y rompa al hacer bind en better-sqlite3.
+    if (!Number.isInteger(productoId) || !Number.isSafeInteger(productoId)) {
       return { exito: false, error: 'producto_no_encontrado', mensaje: 'Todos los items deben indicar un producto válido.' };
     }
-    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+    if (!Number.isInteger(cantidad) || !Number.isSafeInteger(cantidad) || cantidad <= 0) {
       return { exito: false, error: 'cantidad_invalida', mensaje: 'La cantidad de cada producto debe ser un número entero mayor a cero.' };
     }
   }
@@ -94,7 +96,7 @@ function crearVenta(datos = {}, usuario = null) {
   }
 
   if (clienteId !== null) {
-    if (!Number.isInteger(clienteId)) {
+    if (!Number.isInteger(clienteId) || !Number.isSafeInteger(clienteId)) {
       return { exito: false, error: 'cliente_no_encontrado', mensaje: 'El id del cliente no es válido.' };
     }
     const cliente = clientesRepo.buscarPorId(clienteId);
@@ -106,7 +108,7 @@ function crearVenta(datos = {}, usuario = null) {
   const validacionItems = validarItems(items);
   if (!validacionItems.exito) return validacionItems;
 
-  if (!Number.isInteger(descuento) || descuento < 0) {
+  if (!Number.isInteger(descuento) || !Number.isSafeInteger(descuento) || descuento < 0) {
     return { exito: false, error: 'descuento_invalido', mensaje: 'El descuento debe ser un número entero de pesos, mayor o igual a cero.' };
   }
 

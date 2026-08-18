@@ -18,11 +18,13 @@ function registrarAbono(datos = {}, usuario = null) {
   const ventaId = aEntero(datos.ventaId);
   const monto = aEntero(datos.monto);
 
-  if (!Number.isInteger(ventaId)) {
+  // Number.isSafeInteger evita que un valor fuera del rango entero seguro
+  // (ej. 1e21) pase la validación y rompa al hacer bind en better-sqlite3.
+  if (!Number.isInteger(ventaId) || !Number.isSafeInteger(ventaId)) {
     return { exito: false, error: 'venta_invalida', mensaje: 'Debes indicar una venta válida.' };
   }
 
-  if (!Number.isInteger(monto) || monto <= 0) {
+  if (!Number.isInteger(monto) || !Number.isSafeInteger(monto) || monto <= 0) {
     return { exito: false, error: 'monto_invalido', mensaje: 'El monto del abono debe ser un número entero mayor a cero.' };
   }
 

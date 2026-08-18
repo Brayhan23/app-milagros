@@ -15,6 +15,21 @@ function validarCorreo(correo) {
   return typeof correo === 'string' && REGEX_CORREO.test(correo.trim());
 }
 
+// Convierte texto libre guardado en la BD (nombre de producto, nombre de
+// empresa, NIT, dirección, teléfono) a HTML seguro antes de interpolarlo en
+// el correo. Sin esto, un nombre de producto guardado como
+// "<img src=x onerror=...>" se interpretaría como HTML real dentro de la
+// factura emailada en vez de mostrarse como texto.
+function escaparHtml(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Arma el HTML del correo a partir de una venta ya resuelta con sus items
 // (mismos datos que arma ventasService.obtenerVenta / ventasRepo.buscarPorId:
 // no se duplica ninguna consulta ni cálculo de totales).
@@ -28,8 +43,8 @@ function validarCorreo(correo) {
 // se ven bien en cualquier lector de correo, así que esos sí se usan aquí.
 function construirHtmlFactura(venta) {
   const empresa = configuracionRepo.obtener() || {};
-  const nombreEmpresa = empresa.nombre_empresa || 'Milagros';
-  const lineaEmpresa = [empresa.nit ? `NIT ${empresa.nit}` : null, empresa.direccion, empresa.telefono]
+  const nombreEmpresa = escaparHtml(empresa.nombre_empresa || 'Milagros');
+  const lineaEmpresa = [empresa.nit ? `NIT ${escaparHtml(empresa.nit)}` : null, escaparHtml(empresa.direccion), escaparHtml(empresa.telefono)]
     .filter(Boolean)
     .join(' · ');
 
@@ -37,7 +52,7 @@ function construirHtmlFactura(venta) {
     .map(
       (item) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #e3e3e3;">${item.nombre_producto}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e3e3e3;">${escaparHtml(item.nombre_producto)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #e3e3e3;text-align:center;">${item.cantidad}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #e3e3e3;text-align:right;">${formatearPesos(item.precio_unitario)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #e3e3e3;text-align:right;">${formatearPesos(item.subtotal)}</td>

@@ -19,14 +19,18 @@ function aEntero(valor) {
 }
 
 function validarPrecio(valor, etiqueta) {
-  if (!Number.isInteger(valor) || valor < 0) {
+  // Number.isSafeInteger además de Number.isInteger: un valor como 1e21 pasa
+  // Number.isInteger (no tiene parte decimal) pero excede el rango de entero
+  // seguro de JS/SQLite — sin este chequeo, better-sqlite3 lanza un
+  // RangeError al hacer bind, y esa excepción no atrapada tumba el proceso.
+  if (!Number.isInteger(valor) || !Number.isSafeInteger(valor) || valor < 0) {
     return `El precio ${etiqueta} debe ser un número entero de pesos, mayor o igual a cero.`;
   }
   return null;
 }
 
 function validarEnteroNoNegativo(valor, etiqueta) {
-  if (!Number.isInteger(valor) || valor < 0) {
+  if (!Number.isInteger(valor) || !Number.isSafeInteger(valor) || valor < 0) {
     return `${etiqueta} debe ser un número entero mayor o igual a cero.`;
   }
   return null;
@@ -237,7 +241,7 @@ function ingresarStock(id, cantidad, usuario = null) {
   }
 
   const cantidadEntera = aEntero(cantidad);
-  if (!Number.isInteger(cantidadEntera) || cantidadEntera <= 0) {
+  if (!Number.isInteger(cantidadEntera) || !Number.isSafeInteger(cantidadEntera) || cantidadEntera <= 0) {
     return {
       exito: false,
       error: 'cantidad_invalida',

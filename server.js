@@ -27,6 +27,19 @@ app.use('/api', requiereSesion, reportesRoutes);
 app.use('/api', requiereSesion, auditoriaRoutes);
 app.use('/api', requiereSesion, backupRoutes);
 
+// Red de seguridad adicional: si una ruta deja escapar una excepción no
+// atrapada (ej. un valor que pasó las validaciones de negocio pero rompe al
+// hacer bind en better-sqlite3), esto evita que tumbe el proceso completo
+// de Node — responde 500 genérico y el servidor sigue sirviendo el resto de
+// las requests. No reemplaza las validaciones de cada dominio, es un
+// respaldo para lo que se les escape. Debe registrarse después de todas las
+// rutas: Express solo lo invoca cuando algo aguas arriba llama a next(err)
+// o lanza una excepción.
+app.use((err, req, res, next) => {
+  console.error('Error no controlado en una ruta:', err);
+  res.status(500).json({ exito: false, mensaje: 'Ocurrió un error inesperado en el servidor.' });
+});
+
 const PORT = process.env.PORT || 3000;
 const HOST = '127.0.0.1';
 // La app es local-first: corre en el PC de la tienda y no debería ser

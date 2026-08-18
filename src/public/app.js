@@ -27,6 +27,20 @@ document.addEventListener('DOMContentLoaded', () => {
   verificarSesion();
 });
 
+// Convierte texto libre que viene del backend (nombre de producto, cliente,
+// detalle de auditoría, etc.) a HTML seguro antes de interpolarlo con
+// innerHTML. Sin esto, un nombre guardado como "<img src=x onerror=...>" se
+// interpretaría como HTML real en vez de mostrarse como texto en pantalla.
+function escaparHtml(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function obtenerHeaders() {
   const token = localStorage.getItem('token');
   return {
@@ -365,7 +379,7 @@ async function cargarAlertasStock() {
 
     contenedorAlertas.innerHTML = data.productos.map(p => `
       <div class="alerta-item">
-        ⚠️ <strong>${p.nombre}</strong> (ID: ${p.id}): Quedan ${p.stock_actual} und. (Mínimo: ${p.stock_minimo})
+        ⚠️ <strong>${escaparHtml(p.nombre)}</strong> (ID: ${p.id}): Quedan ${p.stock_actual} und. (Mínimo: ${p.stock_minimo})
       </div>
     `).join('');
   } catch (err) {
@@ -394,8 +408,8 @@ async function cargarStockTiempoReal() {
       return `
         <tr>
           <td><strong>${item.id}</strong></td>
-          <td>${item.codigo_barras || '—'}</td>
-          <td><strong>${item.nombre}</strong></td>
+          <td>${escaparHtml(item.codigo_barras) || '—'}</td>
+          <td><strong>${escaparHtml(item.nombre)}</strong></td>
           <td>$${item.precio_compra.toLocaleString()}</td>
           <td>$${item.precio_detal.toLocaleString()}</td>
           <td>$${item.precio_mayor.toLocaleString()}</td>
@@ -451,7 +465,7 @@ async function cargarProductosParaVenta() {
     productosDisponibles = data.exito ? data.productos : [];
 
     selectVentaProducto.innerHTML = productosDisponibles
-      .map((p) => `<option value="${p.id}">${p.nombre} (stock: ${p.stock_actual})</option>`)
+      .map((p) => `<option value="${p.id}">${escaparHtml(p.nombre)} (stock: ${p.stock_actual})</option>`)
       .join('') || '<option value="">No hay productos disponibles</option>';
     actualizarMaximoCantidad();
   } catch (err) {
@@ -466,7 +480,7 @@ async function cargarClientesParaVenta() {
     clientesDisponibles = data.exito ? data.clientes : [];
 
     selectVentaCliente.innerHTML = clientesDisponibles
-      .map((c) => `<option value="${c.id}">${c.nombre}${c.documento ? ' (' + c.documento + ')' : ''}</option>`)
+      .map((c) => `<option value="${c.id}">${escaparHtml(c.nombre)}${c.documento ? ' (' + escaparHtml(c.documento) + ')' : ''}</option>`)
       .join('') || '<option value="">No hay clientes registrados</option>';
   } catch (err) {
     selectVentaCliente.innerHTML = '<option value="">Error al cargar clientes</option>';
@@ -541,7 +555,7 @@ function renderizarCarrito() {
       const subtotal = precioUnitario * item.cantidad;
       return `
         <tr>
-          <td>${item.nombre}</td>
+          <td>${escaparHtml(item.nombre)}</td>
           <td>${item.cantidad}</td>
           <td>$${precioUnitario.toLocaleString()}</td>
           <td>$${subtotal.toLocaleString()}</td>
@@ -661,7 +675,7 @@ function mostrarFactura(venta) {
     .map(
       (item) => `
       <tr>
-        <td>${item.nombre_producto}</td>
+        <td>${escaparHtml(item.nombre_producto)}</td>
         <td>${item.cantidad}</td>
         <td>$${item.precio_unitario.toLocaleString()}</td>
         <td>$${item.subtotal.toLocaleString()}</td>
@@ -798,8 +812,8 @@ async function cargarDeudores() {
         (c) => `
         <tr class="${c.en_mora ? 'fila-mora' : ''}">
           <td>${c.id}</td>
-          <td>${c.nombre}</td>
-          <td>${c.documento || '—'}</td>
+          <td>${escaparHtml(c.nombre)}</td>
+          <td>${escaparHtml(c.documento) || '—'}</td>
           <td>$${c.saldo_total.toLocaleString()}</td>
           <td>
             ${c.dias_deuda_mas_vieja} día(s)
@@ -853,7 +867,7 @@ btnVerDeuda.addEventListener('click', async () => {
       : '<li class="empty-state">Sin abonos registrados.</li>';
 
     detalleDeuda.innerHTML = `
-      <p><strong>${data.cliente.nombre}</strong> — Saldo total pendiente: <strong>$${data.saldoTotal.toLocaleString()}</strong></p>
+      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: <strong>$${data.saldoTotal.toLocaleString()}</strong></p>
       <table class="tabla-inventario">
         <thead>
           <tr><th>Venta</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Factura</th></tr>
@@ -1177,7 +1191,7 @@ function renderizarListadoVentas(tbody, ventas) {
       <tr>
         <td>${v.id}</td>
         <td>${v.creado_en}</td>
-        <td>${v.nombre_cliente || 'Mostrador'}</td>
+        <td>${escaparHtml(v.nombre_cliente) || 'Mostrador'}</td>
         <td>${ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago}</td>
         <td>$${v.total.toLocaleString()}</td>
         <td><button type="button" class="btn btn-secondary btn-ver-factura" data-venta-id="${v.id}">Ver factura</button></td>
@@ -1281,7 +1295,7 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
       .map(
         (p) => `
         <tr>
-          <td>${p.nombre}</td>
+          <td>${escaparHtml(p.nombre)}</td>
           <td>${p.unidades_vendidas}</td>
           <td>$${p.ingreso_generado.toLocaleString()}</td>
         </tr>
@@ -1360,11 +1374,11 @@ async function cargarAuditoria() {
         (evento) => `
         <tr>
           <td>${evento.creado_en}</td>
-          <td>${evento.usuario}</td>
-          <td>${evento.accion}</td>
-          <td>${evento.entidad || ''}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
-          <td>${evento.detalle || ''}</td>
-          <td>${evento.ip || ''}</td>
+          <td>${escaparHtml(evento.usuario)}</td>
+          <td>${escaparHtml(evento.accion)}</td>
+          <td>${escaparHtml(evento.entidad)}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
+          <td>${escaparHtml(evento.detalle)}</td>
+          <td>${escaparHtml(evento.ip)}</td>
         </tr>
       `
       )

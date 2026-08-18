@@ -3,8 +3,8 @@ const backupService = require('../domain/backupService');
 
 const router = express.Router();
 
-// Sin autenticación: ninguna ruta del proyecto la tiene todavía (no hay
-// middleware de sesión/token). Queda igual de expuesto que /login por ahora.
+// Protegida por requiereSesion: se monta bajo app.use('/api', requiereSesion,
+// backupRoutes) en server.js, igual que el resto de rutas /api excepto /login.
 router.post('/backup', async (req, res) => {
   const resultado = await backupService.ejecutarBackup();
 
