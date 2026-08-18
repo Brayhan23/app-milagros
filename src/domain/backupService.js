@@ -6,6 +6,18 @@ const BACKUP_PATH = process.env.BACKUP_PATH;
 const RETENCION_DIAS = parseInt(process.env.BACKUP_RETENCION_DIAS, 10) || 30;
 const INTERVALO_CHEQUEO_MS = 60 * 60 * 1000; // 1 hora
 
+// Sin esto, un BACKUP_PATH faltante hacía que el chequeo automático
+// (verificarYEjecutarBackupSiFalta) se saltara el backup en completo
+// silencio: necesitaBackupHoy() devuelve false y ejecutarBackup() nunca se
+// llega a invocar, así que su propio mensaje de error ("BACKUP_PATH no está
+// configurado") tampoco se dispara nunca. El backup automático es requisito
+// crítico (ver CLAUDE.md) — esta advertencia se imprime apenas arranca el
+// módulo (antes de que exista ninguna request), para que sea imposible no
+// verla al hacer npm start.
+if (!BACKUP_PATH) {
+  console.warn('ADVERTENCIA: BACKUP_PATH no está configurado. El respaldo automático NO se está ejecutando.');
+}
+
 const LOG_PATH = path.join(__dirname, '..', '..', 'logs', 'backup.log');
 const PREFIJO = path.basename(db.name, path.extname(db.name));
 const PATRON_BACKUP = new RegExp(`^${PREFIJO}-(\\d{4}-\\d{2}-\\d{2})\\.db$`);
@@ -90,6 +102,16 @@ async function ejecutarBackup() {
 }
 
 async function verificarYEjecutarBackupSiFalta() {
+  // Mismo motivo que la advertencia de arranque: acá es donde el chequeo
+  // automático (arranque + cada hora) se saltaría el backup en silencio si
+  // no fuera por esto. No aplica al disparo manual vía POST /backup: ese
+  // camino pasa directo por ejecutarBackup(), que ya responde su propio
+  // error claro sin pasar por esta función.
+  if (!BACKUP_PATH) {
+    console.warn('ADVERTENCIA: BACKUP_PATH no está configurado. El respaldo automático NO se está ejecutando.');
+    return;
+  }
+
   if (necesitaBackupHoy()) {
     await ejecutarBackup();
   }
