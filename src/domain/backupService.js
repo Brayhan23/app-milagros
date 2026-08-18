@@ -5,6 +5,11 @@ const db = require('../data/db');
 const BACKUP_PATH = process.env.BACKUP_PATH;
 const RETENCION_DIAS = parseInt(process.env.BACKUP_RETENCION_DIAS, 10) || 30;
 const INTERVALO_CHEQUEO_MS = 60 * 60 * 1000; // 1 hora
+const UN_GB = 1024 ** 3;
+// Umbral de espacio libre en disco por debajo del cual se advierte. Mismo
+// criterio que BACKUP_RETENCION_DIAS/AUDITORIA_RETENCION_DIAS: configurable
+// por .env, con un default razonable (1GB) si no se define.
+const ESPACIO_MINIMO_BYTES = (parseInt(process.env.ESPACIO_MINIMO_GB, 10) || 1) * UN_GB;
 
 // Sin esto, un BACKUP_PATH faltante hacía que el chequeo automático
 // (verificarYEjecutarBackupSiFalta) se saltara el backup en completo
@@ -51,6 +56,33 @@ function registrarLog(entrada) {
   console.log(`[backup] ${linea}`);
 }
 
+// Espacio libre real del disco donde vive `ruta`, vía fs.statfsSync (nativo
+// de Node desde v18.15, sin dependencia nueva — mismo criterio que ya se usó
+// para scripts/verificar-backup.js). Se ejecuta junto al backup diario (no
+// es un sistema de monitoreo aparte): si el disco de la BD o el de los
+// respaldos se está quedando sin espacio, es exactamente el momento en que
+// más importa enterarse, porque un backup que falla por falta de espacio es
+// tan grave como no tener backup en absoluto.
+function espacioLibreBytes(ruta) {
+  try {
+    const info = fs.statfsSync(ruta);
+    return info.bavail * info.bsize;
+  } catch (error) {
+    // Ruta no consultable (permisos, unidad de red caída, etc.): no bloquea
+    // el backup por esto, simplemente no se puede advertir sobre ese disco.
+    return null;
+  }
+}
+
+function advertirSiEspacioBajo(etiqueta, ruta) {
+  const libres = espacioLibreBytes(ruta);
+  if (libres === null || libres >= ESPACIO_MINIMO_BYTES) return;
+
+  const mensaje = `ADVERTENCIA: queda menos de ${(ESPACIO_MINIMO_BYTES / UN_GB).toFixed(1)}GB libres en el disco de ${etiqueta} (${ruta}): ${(libres / UN_GB).toFixed(2)}GB disponibles.`;
+  console.warn(mensaje);
+  registrarLog({ evento: 'espacio_bajo', etiqueta, ruta, bytesLibres: libres });
+}
+
 function rotarBackups() {
   try {
     const archivos = fs
@@ -85,6 +117,13 @@ async function ejecutarBackup() {
   backupEnCurso = true;
   try {
     fs.mkdirSync(BACKUP_PATH, { recursive: true });
+
+    // Ambas rutas ya existen en este punto (data/ la crea db.js al arrancar;
+    // BACKUP_PATH se acaba de crear arriba), así que se pueden consultar
+    // directo sin manejar el caso "todavía no existe".
+    advertirSiEspacioBajo('la base de datos', path.dirname(db.name));
+    advertirSiEspacioBajo('los respaldos', BACKUP_PATH);
+
     const destino = rutaBackupDeHoy();
     await db.backup(destino);
     const { size } = fs.statSync(destino);

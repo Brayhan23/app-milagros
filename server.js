@@ -4,6 +4,7 @@ const express = require('express');
 const authRoutes = require('./src/routes/authRoutes');
 const backupRoutes = require('./src/routes/backupRoutes');
 const backupService = require('./src/domain/backupService');
+const mantenimientoService = require('./src/domain/mantenimientoService');
 const productosRoutes = require('./src/routes/productosRoutes');
 const ventasRoutes = require('./src/routes/ventasRoutes');
 const clientesRoutes = require('./src/routes/clientesRoutes');
@@ -53,4 +54,5 @@ app.listen(PORT, HOST, () => {
   console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
   backupService.iniciarProgramacionBackup();
   auditoriaService.iniciarProgramacionPurga();
+  mantenimientoService.iniciarProgramacionVacuum();
 });
