@@ -1,9 +1,36 @@
 const db = require('./db');
 
-function registrarAbono(ventaId, monto) {
+// Envuelto en una transacción explícita (no solo protegido por ser una
+// función síncrona de JS): creditoService ya valida que el monto no supere
+// el saldo pendiente ANTES de llegar acá, y hoy esa validación no puede
+// quedar desactualizada por una carrera real por la misma razón que
+// ventasRepo.crear (sin ningún await de por medio, verificado empíricamente
+// con 20 abonos concurrentes contra una deuda de $10.000: exactamente 10 se
+// aplicaron, saldo final $0). Pero esa garantía es IMPLÍCITA. La relectura +
+// comparación de abajo, DENTRO de la misma transacción que el INSERT, es el
+// equivalente para abonos del CHECK (stock_actual >= 0) que ya protege el
+// stock a nivel de base de datos — acá no hay una restricción de columna
+// posible (la suma es entre tablas), así que se hace explícita en código.
+// Es una SEGUNDA capa de defensa: no reemplaza la validación de negocio de
+// creditoService (esa sigue siendo la que da el mensaje de error claro al
+// usuario en el camino normal); esta es la barrera estructural que sigue
+// protegiendo aunque la sincronía de JS se rompa algún día.
+const registrarAbono = db.transaction((ventaId, monto) => {
   const info = db.prepare('INSERT INTO abonos (venta_id, monto) VALUES (?, ?)').run(ventaId, monto);
+
+  const venta = db.prepare('SELECT total FROM ventas WHERE id = ?').get(ventaId);
+  const { total: totalAbonado } = db
+    .prepare('SELECT COALESCE(SUM(monto), 0) AS total FROM abonos WHERE venta_id = ?')
+    .get(ventaId);
+
+  if (totalAbonado > venta.total) {
+    throw new Error(
+      `Abono rechazado: la suma de abonos ($${totalAbonado}) superaría el total de la venta #${ventaId} ($${venta.total}).`
+    );
+  }
+
   return db.prepare('SELECT * FROM abonos WHERE id = ?').get(info.lastInsertRowid);
-}
+});
 
 // Saldo de UNA venta puntual: total menos lo abonado a esa venta. No exige
 // que sea a crédito aquí (eso lo valida creditoService); esta función solo

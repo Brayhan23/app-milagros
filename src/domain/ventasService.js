@@ -154,13 +154,47 @@ function crearVenta(datos = {}, usuario = null) {
     };
   });
 
+  // Number.isSafeInteger sobre los CALCULADOS, no solo sobre precio/cantidad
+  // de entrada: precio y cantidad pueden pasar Number.isSafeInteger cada uno
+  // por separado y aun así su PRODUCTO exceder el rango entero seguro de JS
+  // (ej. precio=999.999.999.999 × cantidad=90.000 da un subtotal que ya no
+  // es un entero seguro, con pérdida de precisión real y demostrable en
+  // operaciones posteriores como restarle el descuento). Se revisa acá,
+  // antes de guardar nada — rechazar temprano con un mensaje claro es mejor
+  // que guardar un monto numéricamente incorrecto en la factura.
+  for (const item of itemsProcesados) {
+    if (!Number.isSafeInteger(item.subtotal)) {
+      return {
+        exito: false,
+        error: 'monto_invalido',
+        mensaje: `El subtotal de "${item.nombreProducto}" quedó fuera del rango numérico seguro. Revisa el precio y la cantidad.`,
+      };
+    }
+  }
+
   const subtotal = itemsProcesados.reduce((suma, item) => suma + item.subtotal, 0);
+
+  if (!Number.isSafeInteger(subtotal)) {
+    return {
+      exito: false,
+      error: 'monto_invalido',
+      mensaje: 'El subtotal total de la venta quedó fuera del rango numérico seguro.',
+    };
+  }
 
   if (descuento > subtotal) {
     return { exito: false, error: 'descuento_invalido', mensaje: 'El descuento no puede ser mayor al subtotal de la venta.' };
   }
 
   const total = subtotal - descuento;
+
+  if (!Number.isSafeInteger(total)) {
+    return {
+      exito: false,
+      error: 'monto_invalido',
+      mensaje: 'El total de la venta quedó fuera del rango numérico seguro.',
+    };
+  }
   // Tasa vigente AL MOMENTO de la venta: se guarda como "foto" en la propia
   // venta (ver ventasRepo/schema.sql) para que un cambio futuro del % de IVA
   // general del negocio no altere facturas ya emitidas.
