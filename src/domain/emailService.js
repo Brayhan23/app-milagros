@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
 const ventasService = require('./ventasService');
 const configuracionRepo = require('../data/configuracionRepo');
+const auditoriaService = require('./auditoriaService');
+const { ACCIONES } = auditoriaService;
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -106,7 +108,7 @@ function crearTransportador() {
   });
 }
 
-async function enviarFacturaPorCorreo(ventaId, correoDestino) {
+async function enviarFacturaPorCorreo(ventaId, correoDestino, usuario = null) {
   const resultadoVenta = ventasService.obtenerVenta(ventaId);
   if (!resultadoVenta.exito) {
     return resultadoVenta; // ya trae { exito:false, error:'no_encontrado', mensaje }
@@ -126,19 +128,41 @@ async function enviarFacturaPorCorreo(ventaId, correoDestino) {
 
   const venta = resultadoVenta.venta;
   const nombreEmpresa = (configuracionRepo.obtener() || {}).nombre_empresa || 'Milagros';
+  const correoDestinoLimpio = correoDestino.trim();
 
   try {
     const transportador = crearTransportador();
     await transportador.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: correoDestino.trim(),
+      to: correoDestinoLimpio,
       subject: `${nombreEmpresa} — Factura N.° ${venta.id}`,
       html: construirHtmlFactura(venta),
     });
+
+    // Única vía por la que datos de una venta salen del sistema hacia un
+    // tercero: queda trazado igual que el resto de acciones sensibles, para
+    // poder responder después "quién envió qué factura, a qué correo".
+    auditoriaService.registrar({
+      usuario,
+      accion: ACCIONES.FACTURA_ENVIADA_CORREO,
+      entidad: 'venta',
+      entidadId: venta.id,
+      detalle: `Factura de la venta #${venta.id} enviada por correo a "${correoDestinoLimpio}".`,
+    });
+
     return { exito: true };
   } catch (error) {
     // Nunca loguear el objeto de configuración/credenciales, solo el mensaje del error.
     console.error('Error al enviar factura por correo:', error.message);
+
+    auditoriaService.registrar({
+      usuario,
+      accion: ACCIONES.FACTURA_ENVIADA_CORREO,
+      entidad: 'venta',
+      entidadId: venta.id,
+      detalle: `Intento fallido de enviar la factura de la venta #${venta.id} por correo a "${correoDestinoLimpio}".`,
+    });
+
     return {
       exito: false,
       error: 'envio_fallido',

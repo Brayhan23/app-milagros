@@ -80,7 +80,7 @@ router.delete('/clientes/:id', (req, res) => {
     return res.status(400).json({ exito: false, mensaje: 'El id del cliente debe ser un número entero.' });
   }
 
-  const resultado = clientesService.desactivarCliente(id);
+  const resultado = clientesService.desactivarCliente(id, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, cliente: resultado.cliente });
 });

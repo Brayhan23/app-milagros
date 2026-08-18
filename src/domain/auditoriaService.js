@@ -24,9 +24,11 @@ const ACCIONES = Object.freeze({
   STOCK_INGRESADO: 'stock_ingresado',
   CLIENTE_CREADO: 'cliente_creado',
   CLIENTE_ACTUALIZADO: 'cliente_actualizado',
+  CLIENTE_DESACTIVADO: 'cliente_desactivado',
   CONFIGURACION_ACTUALIZADA: 'configuracion_actualizada',
   RECUPERACION_SOLICITADA: 'recuperacion_solicitada',
   RECUPERACION_COMPLETADA: 'recuperacion_completada',
+  FACTURA_ENVIADA_CORREO: 'factura_enviada_correo',
 });
 
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;

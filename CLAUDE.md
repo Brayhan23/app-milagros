@@ -25,6 +25,27 @@
 - Consultas SQL siempre parametrizadas, nunca concatenadas
 - .env y *.db nunca se commitean
 
+## Limitaciones de arquitectura conocidas
+- El sistema asume un solo usuario/rol viendo y operando todos los datos (HU-01 no
+  distingue "admin" de "cajero", ni tiene concepto de "esto es mío" vs. "esto es de
+  otro"). Por eso ningún endpoint verifica pertenencia sobre un `:id` (productos,
+  ventas, clientes, abonos): cualquier sesión válida puede ver/editar cualquier
+  registro, y eso es correcto hoy porque no hay nada contra qué comparar.
+- Las ventas y los abonos NO guardan quién los hizo. El `usuario` que llega a
+  `ventasService.crearVenta` / `creditoService.registrarAbono` se usa solo para el
+  registro de auditoría — la fila de `ventas`/`abonos` en sí no tiene columna
+  `usuario_id`/`vendedor_id`. Lo único que hoy responde "quién hizo esta venta" es la
+  tabla `auditoria`, que se purga a los `AUDITORIA_RETENCION_DIAS` (30 días por
+  defecto; los registros vencidos se archivan en `auditoria_archivo` antes de
+  borrarse de la tabla activa, no se pierden, pero quedan fuera de las consultas
+  normales).
+- Si en el futuro se necesita soporte multiusuario con visibilidad restringida (ej.
+  un cajero que solo vea sus propias ventas), hace falta una migración de esquema
+  para agregar esa columna — y esa información **no se puede reconstruir
+  retroactivamente** para las ventas ya guardadas antes del cambio: la única pista
+  que existiría es cruzar con `auditoria`/`auditoria_archivo` por `entidad_id`, y solo
+  para lo que no se haya perdido en el tiempo.
+
 ## Git
 - Rama base: develop
 - Cada historia en su propia rama: feature/hu-XX-nombre

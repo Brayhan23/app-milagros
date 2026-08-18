@@ -66,7 +66,7 @@ router.post('/ventas/:id/enviar-correo', async (req, res) => {
   }
 
   const { correoDestino } = req.body || {};
-  const resultado = await emailService.enviarFacturaPorCorreo(id, correoDestino);
+  const resultado = await emailService.enviarFacturaPorCorreo(id, correoDestino, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
 
   return res.json({ exito: true, mensaje: 'Factura enviada por correo correctamente.' });

@@ -120,12 +120,23 @@ function actualizarCliente(id, datos = {}, usuario = null) {
   return { exito: true, cliente };
 }
 
-function desactivarCliente(id) {
+function desactivarCliente(id, usuario = null) {
   const actual = clientesRepo.buscarPorId(id);
   if (!actual) {
     return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el cliente.' };
   }
-  return { exito: true, cliente: clientesRepo.desactivar(id) };
+
+  const cliente = clientesRepo.desactivar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CLIENTE_DESACTIVADO,
+    entidad: 'cliente',
+    entidadId: id,
+    detalle: `Cliente "${actual.nombre}" (id ${id}) desactivado.`,
+  });
+
+  return { exito: true, cliente };
 }
 
 module.exports = { crearCliente, listarClientes, buscarClientePorId, actualizarCliente, desactivarCliente };
