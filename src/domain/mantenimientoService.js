@@ -17,8 +17,15 @@ const db = require('../data/db');
 //   una cadencia baja en vez de cada hora/día.
 const INTERVALO_CHEQUEO_MS = 60 * 60 * 1000; // 1 hora
 
-const MARCADOR_PATH = path.join(__dirname, '..', '..', 'logs', 'ultimo-vacuum.txt');
-const LOG_PATH = path.join(__dirname, '..', '..', 'logs', 'backup.log');
+// process.cwd(), NO __dirname: dentro de un ejecutable empaquetado (pkg),
+// __dirname apunta a una ruta virtual DENTRO del snapshot de solo lectura
+// del binario — escribir ahí falla en silencio. process.cwd() apunta a la
+// carpeta real desde donde se lanzó el proceso, que es donde debe vivir
+// cualquier archivo que la app necesite ESCRIBIR. Mismo criterio que
+// DB_PATH (db.js) y LOG_PATH (backupService.js).
+const LOGS_DIR = path.resolve(process.cwd(), process.env.LOGS_PATH || './logs');
+const MARCADOR_PATH = path.join(LOGS_DIR, 'ultimo-vacuum.txt');
+const LOG_PATH = path.join(LOGS_DIR, 'backup.log');
 
 function mesActual(fecha = new Date()) {
   return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;

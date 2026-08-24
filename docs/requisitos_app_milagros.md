@@ -204,16 +204,175 @@ guardaste en el Paso 3 (`milagros.db-roto`, renombrado de vuelta a
 
 ---
 
+## Empaquetado y despliegue
+
+### Estructura de carpetas en el PC del cliente
+
+Todo lo que la app necesita ESCRIBIR debe vivir separado de todo lo que es
+código — así una actualización (reemplazar el ejecutable) nunca puede pisar
+datos, y un backup solo necesita respaldar una carpeta, no medio Program
+Files. Estructura propuesta:
+
+```
+C:\AppMilagros\                    (carpeta de instalación, elegida al instalar)
+├── app-milagros.exe               ← se REEMPLAZA en cada actualización
+├── better_sqlite3.node            ← addon nativo, junto al exe (ver más abajo)
+├── bcrypt.node                    ← addon nativo, junto al exe
+├── .env                           ← configuración local — NUNCA se toca al actualizar
+├── iniciar.bat                    ← lanzador para el inicio automático (ver punto 4)
+├── data\
+│   └── milagros.db                ← la BD real — persiste entre actualizaciones
+├── logs\
+│   ├── backup.log
+│   └── ultimo-vacuum.txt
+└── uploads\
+    └── logo.png                   ← logo de la empresa (dato de la usuaria, no código)
+
+C:\Users\<usuario>\Google Drive\MilagrosBackups\   ← BACKUP_PATH, fuera de C:\AppMilagros\ a propósito
+├── milagros-2026-08-01.db
+├── milagros-2026-08-02.db
+└── ...
+```
+
+Reglas de esta estructura:
+- **`data\` y `logs\` van AL LADO del ejecutable, no dentro de ninguna carpeta
+  de código.** Ya son escritos usando `process.cwd()` (no `__dirname`), así
+  que basta con que `iniciar.bat` arranque el `.exe` desde `C:\AppMilagros\`
+  para que todo caiga en el lugar correcto — ver el punto 4 sobre por qué el
+  `.bat` debe fijar el directorio de trabajo explícitamente en vez de
+  confiar en el comportamiento por defecto de Windows.
+- **`BACKUP_PATH` vive deliberadamente FUERA de `C:\AppMilagros\`**, en la
+  carpeta sincronizada por Google Drive Desktop: si `C:\AppMilagros\`
+  entero se corrompe o el disco falla, los backups no deben estar en el
+  mismo lugar que lo que se dañó.
+- **`uploads\` también queda fuera del ejecutable** (ver hallazgo de
+  empaquetado más abajo — hoy vive mezclada con el código en
+  `src/public/uploads/`, algo que hay que resolver como parte del propio
+  trabajo de empaquetado, no antes).
+
+### Hallazgos de la revisión de compatibilidad con `pkg` (2026-08-24)
+
+Se revisó código por código si algo se rompería al empaquetar. Dos
+correcciones de código genuinas ya se hicieron (no dependen de cómo se
+configure el empaquetado, eran conceptualmente incorrectas de todas formas):
+
+- **Corregido**: `backupService.js` y `mantenimientoService.js` calculaban
+  la ruta de `logs/` con `__dirname` (relativo al código fuente). Dentro de
+  un ejecutable `pkg`, `__dirname` apunta a una ruta virtual DENTRO del
+  snapshot de solo lectura — escribir ahí falla en silencio. Se cambió a
+  `process.cwd()` (mismo criterio que ya usaba `DB_PATH`), y se agregó
+  `LOGS_PATH` a `.env`/`.env.example` para que sea configurable igual que
+  `BACKUP_PATH`. Verificado con servidor real: arranca sin errores, backup
+  y log siguen escribiendo donde deben.
+- **Corregido**: la lectura de `schema.sql` en `db.js` no tenía manejo de
+  error — si el archivo faltara (justo el síntoma de un empaquetado que
+  olvidó incluirlo como asset), tiraba un stack trace críptico. Ahora falla
+  con un mensaje claro que dice explícitamente que revisar los assets del
+  paquete si esto corre empaquetado.
+
+Hallazgos que **quedan pendientes para la propia tarea de empaquetado** (no
+se tocan ahora, tal como se pidió):
+
+- 🔴 **Los dos addons nativos (`better-sqlite3`, `bcrypt`) son archivos
+  `.node` compilados** — `pkg` NO puede meterlos dentro del snapshot de
+  JavaScript. Tienen que copiarse sueltos junto al `.exe` y cargarse desde
+  ahí explícitamente. Es el punto de mayor riesgo de todo el empaquetado:
+  si se hace mal, la app ni siquiera arranca. Además, el addon compilado
+  tiene que coincidir con la versión de Node que `pkg` empaqueta (por eso
+  conviene fijar el target de `pkg` a Node 22, coherente con el `.nvmrc` ya
+  agregado).
+- 🔴 **`pkg` (`vercel/pkg`) está sin mantenimiento desde 2023.** Usar el
+  fork mantenido por la comunidad, `@yao-pkg/pkg`, en vez del paquete
+  original.
+- 🟡 **`pdfkit` lee archivos de fuente (`.afm`) desde disco en tiempo de
+  ejecución** (`node_modules/pdfkit/js/data/Helvetica*.afm`, entre otros) —
+  exactamente las fuentes que usa `exportacionService.js`. Hay que
+  declararlos explícitamente como assets del paquete (`pkg.assets` en
+  `package.json`), no confiar solo en la detección automática de `pkg`.
+- 🟡 **`schema.sql` y todo `src/public/**` (frontend) también necesitan
+  declararse como assets explícitos** en `package.json` — son código/datos
+  de solo lectura que sí deben viajar dentro del snapshot (a diferencia de
+  `data/`/`logs/`), pero `pkg` necesita que se le diga cuáles son.
+- 🔴 **Conflicto real de diseño: `src/public/uploads/` mezcla código
+  (servido como asset de solo lectura) con datos de la usuaria (el logo,
+  que hoy se coloca ahí a mano).** Una vez empaquetado, esa carpeta deja de
+  ser un directorio real en disco — es parte del snapshot. Hay que separar
+  el logo a una carpeta propia fuera del snapshot (ej. `uploads\` al lado
+  del `.exe`, como en la estructura de arriba) y servirla con su propia
+  ruta estática apuntando a `process.cwd()`, no a `__dirname`. Esto se
+  resuelve como parte del propio trabajo de empaquetado.
+
+### Inicio automático con Windows
+
+**Recomendación: un `.bat` simple en la carpeta de inicio de Windows
+(`shell:startup`), no un servicio de Windows ni un instalador con NSSM/PM2.**
+Motivo: el PC es de gama baja — un servicio de Windows corriendo en segundo
+plano desde el arranque del sistema (antes incluso de que la usuaria inicie
+sesión) consume recursos innecesarios para una app que solo se necesita
+mientras la tienda está abierta, y agrega una capa de complejidad
+(instalación de servicio, permisos, logs de servicio aparte) que no aporta
+nada aquí — no es un servidor que deba sobrevivir reinicios sin
+supervisión, es una caja registradora digital que la usuaria prende cuando
+abre y podría cerrar cuando cierra.
+
+El `.bat` debe:
+- Fijar el directorio de trabajo explícitamente con `cd /d "%~dp0"` **antes**
+  de lanzar el ejecutable — no asumir que Windows deja el directorio de
+  trabajo correcto por defecto (varía según cómo se creó el acceso directo).
+  Esto es lo que garantiza que `process.cwd()` (usado por `DB_PATH`,
+  `BACKUP_PATH`, `LOGS_PATH`) resuelva siempre contra `C:\AppMilagros\`, sin
+  importar cómo Windows decida lanzar el `.bat`.
+- Lanzar el `.exe` y **no** abrir una ventana de consola visible permanente
+  si se puede evitar (o dejarla minimizada) — la usuaria no es técnica, una
+  consola negra con texto no le sirve de nada y puede asustarla si la cierra
+  por error pensando que "algo se rompió".
+- No necesita reintentos ni supervisión automática si se cae: para el
+  volumen de esta tienda, si la app se cierra sola, es preferible que la
+  usuaria lo note (no puede facturar) y reabra manualmente, a que un
+  supervisor la reinicie en bucle silenciosamente mientras algo sigue mal.
+
+Ejemplo de contenido de `iniciar.bat` (para armar cuando se haga el
+empaquetado real):
+
+```bat
+@echo off
+cd /d "%~dp0"
+start "" /min app-milagros.exe
+```
+
+Se coloca un **acceso directo** a este `.bat` (no el `.bat` en sí) dentro de
+`shell:startup`, para poder editar el `.bat` real sin tener que volver a
+tocar la carpeta de inicio de Windows cada vez.
+
+---
+
 ## Pendientes antes de entregar al cliente
 
+**Datos y configuración**
 - [ ] Reemplazar usuario admin de pruebas por el usuario real del negocio
 - [ ] Configurar correo real del admin (para recuperación de contraseña)
 - [ ] Configurar datos reales de la empresa en configuracion_empresa (nombre, NIT, dirección, teléfono, correo, logo)
-- [ ] Configurar BACKUP_PATH apuntando a la carpeta real de Google Drive Desktop del cliente
-- [ ] Instalar Google Drive Desktop en el PC del cliente
-- [ ] Configurar SMTP con la cuenta de correo real del negocio (no la cuenta de pruebas del desarrollador)
-- [ ] Empaquetar la app como ejecutable (pkg/nexe) para no requerir Node.js instalado en el PC del cliente
-- [ ] Configurar inicio automático con Windows
-- [ ] Verificar backup real funcionando end-to-end en el PC del cliente, no solo en desarrollo
-- [ ] Borrar cualquier usuario, producto, cliente o venta de prueba antes de la entrega
 - [ ] Confirmar con el cliente el porcentaje de IVA aplicable a sus productos (si quedó configurable)
+- [ ] Borrar cualquier usuario, producto, cliente o venta de prueba antes de la entrega
+
+**Backup y almacenamiento**
+- [ ] Configurar BACKUP_PATH apuntando a la carpeta real de Google Drive Desktop del cliente (fuera de la carpeta de instalación, ver estructura de carpetas arriba)
+- [ ] Instalar Google Drive Desktop en el PC del cliente
+- [ ] Configurar LOGS_PATH y ESPACIO_MINIMO_GB si los defaults no aplican
+- [ ] Verificar backup real funcionando end-to-end en el PC del cliente, no solo en desarrollo
+- [ ] Ejecutar el simulacro de restauración (ver "Procedimiento de restauración de backup" arriba) al menos una vez en el PC real del cliente, no solo en desarrollo
+
+**Correo**
+- [ ] Configurar SMTP con la cuenta de correo real del negocio (no la cuenta de pruebas del desarrollador)
+
+**Empaquetado (ver "Empaquetado y despliegue" arriba para el detalle de cada punto)**
+- [ ] Empaquetar la app con `@yao-pkg/pkg` (no `vercel/pkg`, sin mantenimiento), target Node 22
+- [ ] Copiar los addons nativos (`better-sqlite3`, `bcrypt`) sueltos junto al `.exe` y confirmar que cargan
+- [ ] Declarar `schema.sql`, `src/public/**` y las fuentes `.afm` de `pdfkit` como assets explícitos en `pkg.assets`
+- [ ] Resolver el conflicto de `src/public/uploads/` (separar el logo a una carpeta propia fuera del snapshot)
+- [ ] Verificar que el `.exe` empaquetado sigue funcionando en localhost solamente (repetir la prueba de la pasada 1 de auditoría: alcanzable desde el propio PC, NO alcanzable desde otro dispositivo en la misma red) — el binding a 127.0.0.1 es código, no depende del empaquetado, pero vale la pena confirmarlo corriendo desde el .exe real y no solo con `node server.js`
+- [ ] No requiere instalar Node.js en el PC del cliente (pkg empaqueta su propio runtime) — sí verificar que la versión de Windows del PC del cliente sea compatible con el target elegido
+
+**Inicio automático**
+- [ ] Crear `iniciar.bat` (ver contenido propuesto arriba) y colocar un acceso directo en `shell:startup`
+- [ ] Probar reinicio completo del PC del cliente y confirmar que la app arranca sola, sin ventana de consola molesta, con los datos correctos

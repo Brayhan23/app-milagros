@@ -17,8 +17,25 @@ db.pragma('foreign_keys = ON');
 // y crea las tablas nuevas que se hayan agregado (ej. HU-02 sobre una BD
 // que ya tenía usuarios). Así una BD existente en el PC del cliente se
 // mantiene al día con el esquema sin perder nada de lo que ya tenía.
+// __dirname (no process.cwd()) es correcto acá a propósito: schema.sql es
+// parte del CÓDIGO de la app (viaja con el bundle), no un dato de la
+// usuaria — a diferencia de DB_PATH/LOGS_PATH, que deben resolverse contra
+// la carpeta de instalación real, no contra dónde vive el código fuente.
+// Si el día de mañana esto corre empaquetado (pkg), este archivo tiene que
+// quedar declarado explícitamente como asset del paquete para que el
+// snapshot lo incluya; si no, esta misma línea revienta acá con un mensaje
+// claro en vez de un stack trace críptico.
 const schemaPath = path.join(__dirname, '..', 'config', 'schema.sql');
-const schema = fs.readFileSync(schemaPath, 'utf8');
+let schema;
+try {
+  schema = fs.readFileSync(schemaPath, 'utf8');
+} catch (error) {
+  throw new Error(
+    `No se pudo leer schema.sql en "${schemaPath}" (${error.message}). ` +
+      'La instalación puede estar incompleta o dañada — si esto corre desde un ejecutable empaquetado, ' +
+      'confirmar que schema.sql quedó incluido como asset del paquete.'
+  );
+}
 db.exec(schema);
 
 if (!dbExistia) {

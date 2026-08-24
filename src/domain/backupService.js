@@ -23,7 +23,15 @@ if (!BACKUP_PATH) {
   console.warn('ADVERTENCIA: BACKUP_PATH no está configurado. El respaldo automático NO se está ejecutando.');
 }
 
-const LOG_PATH = path.join(__dirname, '..', '..', 'logs', 'backup.log');
+// process.cwd(), NO __dirname: mismo criterio que DB_PATH en db.js. Dentro
+// de un ejecutable empaquetado (pkg), __dirname apunta a una ruta virtual
+// DENTRO del snapshot de solo lectura del binario — escribir ahí falla en
+// silencio (registrarLog atrapa el error, pero el log nunca se escribe).
+// process.cwd() apunta a la carpeta real desde donde se lanzó el proceso en
+// disco, que es donde debe vivir cualquier archivo que la app necesite
+// ESCRIBIR (logs, marcador de VACUUM, la propia BD). Configurable por
+// LOGS_PATH en .env, con el mismo patrón que BACKUP_PATH/DB_PATH.
+const LOG_PATH = path.join(path.resolve(process.cwd(), process.env.LOGS_PATH || './logs'), 'backup.log');
 const PREFIJO = path.basename(db.name, path.extname(db.name));
 const PATRON_BACKUP = new RegExp(`^${PREFIJO}-(\\d{4}-\\d{2}-\\d{2})\\.db$`);
 
