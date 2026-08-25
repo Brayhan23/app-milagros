@@ -9,6 +9,49 @@ const formLogin = document.getElementById('form-login');
 const mensajeLogin = document.getElementById('mensaje-login');
 const btnLogout = document.getElementById('btn-logout');
 
+// Encabezado: logo (con reserva si uploads/logo.png todavía no existe) y
+// nombre del usuario actual.
+const headerLogo = document.getElementById('header-logo');
+const headerLogoReserva = document.getElementById('header-logo-reserva');
+const headerUsuarioNombre = document.getElementById('header-usuario-nombre');
+const headerUsuarioTexto = document.getElementById('header-usuario-texto');
+
+function activarFallbackLogo() {
+  headerLogo.classList.add('hidden');
+  headerLogoReserva.classList.remove('hidden');
+}
+
+// El <script> vive al final del body, así que el navegador ya empezó (y en
+// un 404 local, puede ya haber TERMINADO) a cargar la imagen antes de que
+// este código llegue a engancharse al evento 'error' — enganchar el
+// listener solo no alcanza, porque el evento pudo haber disparado antes de
+// que existiera el listener. Por eso se revisa primero si ya falló
+// (complete === true y naturalWidth === 0 es la señal de una carga
+// terminada en error) y, si no, recién ahí se espera el evento futuro.
+if (headerLogo.complete && headerLogo.naturalWidth === 0) {
+  activarFallbackLogo();
+} else {
+  headerLogo.addEventListener('error', activarFallbackLogo);
+}
+
+// Nombre de quien inició sesión, solo en memoria (no es un dato de negocio
+// para guardar en localStorage, y el token no lo trae codificado): se
+// conoce apenas después de un login exitoso. Si la página se recarga con
+// una sesión ya activa, el token sigue siendo válido pero este nombre no
+// se puede recuperar sin volver a loguearse — el encabezado simplemente
+// oculta esa línea y deja visible el botón de cerrar sesión, que es lo
+// funcionalmente importante.
+let usuarioActual = null;
+
+function mostrarUsuarioEnHeader() {
+  if (usuarioActual) {
+    headerUsuarioTexto.textContent = usuarioActual;
+    headerUsuarioNombre.classList.remove('hidden');
+  } else {
+    headerUsuarioNombre.classList.add('hidden');
+  }
+}
+
 // Productos DOM
 const formProducto = document.getElementById('form-producto');
 const mensajeProducto = document.getElementById('mensaje-producto');
@@ -41,6 +84,72 @@ function escaparHtml(valor) {
     .replace(/'/g, '&#39;');
 }
 
+// --- Formato de datos (montos y fechas) ---
+
+// Pesos colombianos con separador de miles: 15000 -> "$15.000". Los precios
+// de este negocio siempre son enteros (nunca centavos), así que nunca se
+// muestran decimales.
+function formatearPesos(valor) {
+  const numero = Number(valor) || 0;
+  return `$${numero.toLocaleString('es-CO')}`;
+}
+
+const NOMBRES_MES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+// El backend guarda las fechas como "AAAA-MM-DD HH:MM:SS" (hora del
+// servidor, sin ajuste de zona horaria). Acá se parsean los componentes
+// directo del string, sin pasar por `new Date(string)`: ese constructor
+// interpreta este formato de manera distinta según el motor del navegador
+// (a veces como hora local, a veces como UTC), lo que podría correr la
+// fecha/hora mostrada sin que el dato real haya cambiado. Parseando a mano
+// se reformatea exactamente el mismo instante que ya se mostraba antes,
+// solo que legible.
+function formatearFecha(fechaStr, { conHora = true } = {}) {
+  if (!fechaStr) return '';
+  const match = String(fechaStr).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (!match) return fechaStr;
+
+  const [, anio, mes, dia, hora, minuto] = match;
+  const fechaLegible = `${Number(dia)} de ${NOMBRES_MES[Number(mes) - 1]}, ${anio}`;
+  if (!conHora || hora === undefined) return fechaLegible;
+
+  const horaNum = Number(hora);
+  const periodo = horaNum >= 12 ? 'p.m.' : 'a.m.';
+  const hora12 = horaNum % 12 === 0 ? 12 : horaNum % 12;
+  return `${fechaLegible} · ${hora12}:${minuto} ${periodo}`;
+}
+
+// --- Iconos (sprite de Lucide incrustado en index.html) ---
+// Genera el <svg><use></svg> que referencia un icono del sprite, para no
+// repetir esta marca cada vez que un mensaje/tabla arma HTML con un icono.
+function icono(nombre, claseExtra = '') {
+  return `<svg class="icon ${claseExtra}" aria-hidden="true"><use href="#icon-${nombre}"></use></svg>`;
+}
+
+// --- Mensajes de resultado (éxito / error / alerta) ---
+const ICONO_POR_TIPO = { exito: 'circle-check', error: 'alert-circle', alerta: 'alert-triangle' };
+
+// Reemplaza el patrón repetido "textContent = ...; className = 'mensaje X'"
+// por una sola llamada, agregando el icono correspondiente. Sin texto,
+// limpia el mensaje (mismo comportamiento que antes al vaciar textContent).
+function mostrarMensaje(elemento, texto, tipo) {
+  if (!texto) {
+    elemento.className = 'mensaje';
+    elemento.innerHTML = '';
+    return;
+  }
+  elemento.className = `mensaje ${tipo}`;
+  elemento.innerHTML = `
+    <div class="mensaje-caja">
+      ${icono(ICONO_POR_TIPO[tipo] || 'circle-check', 'icon-sm')}
+      <span>${escaparHtml(texto)}</span>
+    </div>
+  `;
+}
+
 function obtenerHeaders() {
   const token = localStorage.getItem('token');
   return {
@@ -54,6 +163,7 @@ function verificarSesion() {
   if (token) {
     vistaLogin.classList.add('hidden');
     vistaPanel.classList.remove('hidden');
+    mostrarUsuarioEnHeader();
     cargarPanel();
   } else {
     vistaLogin.classList.remove('hidden');
@@ -96,11 +206,10 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
   });
 });
 
-// --- HU-01: AUTENTICACIÓN ---
+// --- AUTENTICACIÓN ---
 formLogin.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeLogin.textContent = '';
-  mensajeLogin.className = 'mensaje';
+  mostrarMensaje(mensajeLogin, '', null);
 
   const usuario = document.getElementById('login-usuario').value.trim();
   const password = document.getElementById('login-password').value;
@@ -115,20 +224,19 @@ formLogin.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeLogin.textContent = data.mensaje || 'Credenciales incorrectas.';
-      mensajeLogin.classList.add('error');
+      mostrarMensaje(mensajeLogin, data.mensaje || 'Credenciales incorrectas.', 'error');
       return;
     }
 
     // El backend emite un token real (UUID) al autenticar; sin él no hay sesión.
     localStorage.setItem('token', data.token);
+    usuarioActual = data.usuario && data.usuario.usuario;
 
     formLogin.reset();
     verificarSesion();
 
   } catch (err) {
-    mensajeLogin.textContent = 'Error de conexión con el servidor.';
-    mensajeLogin.classList.add('error');
+    mostrarMensaje(mensajeLogin, 'Error de conexión con el servidor.', 'error');
   }
 });
 
@@ -158,15 +266,13 @@ function mostrarVistaRecuperarSolicitar() {
   tarjetaLogin.classList.add('hidden');
   vistaRecuperarSolicitar.classList.remove('hidden');
   vistaRecuperarConfirmar.classList.add('hidden');
-  mensajeRecuperarSolicitar.textContent = '';
-  mensajeRecuperarSolicitar.className = 'mensaje';
+  mostrarMensaje(mensajeRecuperarSolicitar, '', null);
 }
 
 function mostrarVistaRecuperarConfirmar() {
   vistaRecuperarSolicitar.classList.add('hidden');
   vistaRecuperarConfirmar.classList.remove('hidden');
-  mensajeRecuperarConfirmar.textContent = '';
-  mensajeRecuperarConfirmar.className = 'mensaje';
+  mostrarMensaje(mensajeRecuperarConfirmar, '', null);
 }
 
 document.getElementById('link-olvide-password').addEventListener('click', (e) => {
@@ -186,8 +292,7 @@ document.getElementById('link-volver-login-2').addEventListener('click', (e) => 
 
 formRecuperarSolicitar.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeRecuperarSolicitar.textContent = '';
-  mensajeRecuperarSolicitar.className = 'mensaje';
+  mostrarMensaje(mensajeRecuperarSolicitar, '', null);
 
   const usuario = document.getElementById('recuperar-usuario').value.trim();
 
@@ -200,34 +305,29 @@ formRecuperarSolicitar.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeRecuperarSolicitar.textContent = data.mensaje || 'No se pudo procesar la solicitud.';
-      mensajeRecuperarSolicitar.classList.add('error');
+      mostrarMensaje(mensajeRecuperarSolicitar, data.mensaje || 'No se pudo procesar la solicitud.', 'error');
       return;
     }
 
     identificadorRecuperacion = usuario;
     formRecuperarConfirmar.reset();
     mostrarVistaRecuperarConfirmar();
-    mensajeRecuperarConfirmar.textContent = data.mensaje;
-    mensajeRecuperarConfirmar.classList.add('exito');
+    mostrarMensaje(mensajeRecuperarConfirmar, data.mensaje, 'exito');
   } catch (err) {
-    mensajeRecuperarSolicitar.textContent = 'Error de conexión con el servidor.';
-    mensajeRecuperarSolicitar.classList.add('error');
+    mostrarMensaje(mensajeRecuperarSolicitar, 'Error de conexión con el servidor.', 'error');
   }
 });
 
 formRecuperarConfirmar.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeRecuperarConfirmar.textContent = '';
-  mensajeRecuperarConfirmar.className = 'mensaje';
+  mostrarMensaje(mensajeRecuperarConfirmar, '', null);
 
   const codigo = document.getElementById('recuperar-codigo').value.trim();
   const nuevaPassword = document.getElementById('recuperar-nueva-password').value;
   const confirmarPassword = document.getElementById('recuperar-confirmar-password').value;
 
   if (nuevaPassword !== confirmarPassword) {
-    mensajeRecuperarConfirmar.textContent = 'Las contraseñas no coinciden.';
-    mensajeRecuperarConfirmar.classList.add('error');
+    mostrarMensaje(mensajeRecuperarConfirmar, 'Las contraseñas no coinciden.', 'error');
     return;
   }
 
@@ -240,8 +340,7 @@ formRecuperarConfirmar.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeRecuperarConfirmar.textContent = data.mensaje || 'No se pudo restablecer la contraseña.';
-      mensajeRecuperarConfirmar.classList.add('error');
+      mostrarMensaje(mensajeRecuperarConfirmar, data.mensaje || 'No se pudo restablecer la contraseña.', 'error');
       return;
     }
 
@@ -249,11 +348,9 @@ formRecuperarConfirmar.addEventListener('submit', async (e) => {
     formRecuperarConfirmar.reset();
     identificadorRecuperacion = '';
     mostrarVistaLogin();
-    mensajeLogin.textContent = data.mensaje;
-    mensajeLogin.classList.add('exito');
+    mostrarMensaje(mensajeLogin, data.mensaje, 'exito');
   } catch (err) {
-    mensajeRecuperarConfirmar.textContent = 'Error de conexión con el servidor.';
-    mensajeRecuperarConfirmar.classList.add('error');
+    mostrarMensaje(mensajeRecuperarConfirmar, 'Error de conexión con el servidor.', 'error');
   }
 });
 
@@ -269,16 +366,16 @@ btnLogout.addEventListener('click', async () => {
     // localmente: no tiene sentido dejar a la usuaria atrapada en el panel.
   } finally {
     localStorage.removeItem('token');
+    usuarioActual = null;
     verificarSesion();
   }
 });
 
 
-// --- HU-02: REGISTRAR PRODUCTO ---
+// --- REGISTRAR PRODUCTO ---
 formProducto.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeProducto.textContent = '';
-  mensajeProducto.className = 'mensaje';
+  mostrarMensaje(mensajeProducto, '', null);
 
   const payload = {
     codigoBarras: document.getElementById('prod-codigo').value.trim() || null,
@@ -301,35 +398,31 @@ formProducto.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeProducto.textContent = data.mensaje || 'Error al registrar el producto.';
-      mensajeProducto.classList.add('error');
+      mostrarMensaje(mensajeProducto, data.mensaje || 'Error al registrar el producto.', 'error');
       return;
     }
 
-    let msg = `✅ Producto "${data.producto.nombre}" registrado exitosamente.`;
+    let msg = `Producto "${data.producto.nombre}" registrado exitosamente.`;
     if (data.advertencias && data.advertencias.length > 0) {
       msg += ` (Advertencia: ${data.advertencias.join(' ')})`;
     }
 
-    mensajeProducto.textContent = msg;
-    mensajeProducto.classList.add('exito');
+    mostrarMensaje(mensajeProducto, msg, 'exito');
     formProducto.reset();
 
     // Refrescar tablas
     cargarPanel();
 
   } catch (err) {
-    mensajeProducto.textContent = 'Error de conexión al guardar el producto.';
-    mensajeProducto.classList.add('error');
+    mostrarMensaje(mensajeProducto, 'Error de conexión al guardar el producto.', 'error');
   }
 });
 
 
-// --- HU-03: REGISTRAR ENTRADA DE STOCK ---
+// --- REGISTRAR ENTRADA DE STOCK ---
 formStock.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeStock.textContent = '';
-  mensajeStock.className = 'mensaje';
+  mostrarMensaje(mensajeStock, '', null);
 
   const id = document.getElementById('stock-producto-id').value;
   const cantidad = Number(document.getElementById('stock-cantidad').value);
@@ -344,25 +437,26 @@ formStock.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeStock.textContent = data.mensaje || 'Error al actualizar el stock.';
-      mensajeStock.classList.add('error');
+      mostrarMensaje(mensajeStock, data.mensaje || 'Error al actualizar el stock.', 'error');
       return;
     }
 
-    mensajeStock.textContent = `✅ Stock actualizado. "${data.producto.nombre}" ahora cuenta con ${data.producto.stock_actual} unidades.`;
-    mensajeStock.classList.add('exito');
+    mostrarMensaje(
+      mensajeStock,
+      `Stock actualizado. "${data.producto.nombre}" ahora cuenta con ${data.producto.stock_actual} unidades.`,
+      'exito'
+    );
     formStock.reset();
 
     cargarPanel();
 
   } catch (err) {
-    mensajeStock.textContent = 'Error de conexión al sumar el stock.';
-    mensajeStock.classList.add('error');
+    mostrarMensaje(mensajeStock, 'Error de conexión al sumar el stock.', 'error');
   }
 });
 
 
-// --- HU-04: ALERTAS DE STOCK BAJO ---
+// --- ALERTAS DE STOCK BAJO ---
 btnActualizarAlertas.addEventListener('click', cargarAlertasStock);
 
 async function cargarAlertasStock() {
@@ -379,7 +473,8 @@ async function cargarAlertasStock() {
 
     contenedorAlertas.innerHTML = data.productos.map(p => `
       <div class="alerta-item">
-        ⚠️ <strong>${escaparHtml(p.nombre)}</strong> (ID: ${p.id}): Quedan ${p.stock_actual} und. (Mínimo: ${p.stock_minimo})
+        ${icono('alert-triangle', 'icon-sm')}
+        <span><strong>${escaparHtml(p.nombre)}</strong> (N.° ${p.id}): quedan ${p.stock_actual} und. (mínimo: ${p.stock_minimo})</span>
       </div>
     `).join('');
   } catch (err) {
@@ -388,7 +483,7 @@ async function cargarAlertasStock() {
 }
 
 
-// --- HU-05: CONSULTA EN TIEMPO REAL ---
+// --- CONSULTA DE STOCK EN TIEMPO REAL ---
 btnCargarStock.addEventListener('click', cargarStockTiempoReal);
 
 async function cargarStockTiempoReal() {
@@ -410,14 +505,14 @@ async function cargarStockTiempoReal() {
           <td><strong>${item.id}</strong></td>
           <td>${escaparHtml(item.codigo_barras) || '—'}</td>
           <td><strong>${escaparHtml(item.nombre)}</strong></td>
-          <td>$${item.precio_compra.toLocaleString()}</td>
-          <td>$${item.precio_detal.toLocaleString()}</td>
-          <td>$${item.precio_mayor.toLocaleString()}</td>
+          <td>${formatearPesos(item.precio_compra)}</td>
+          <td>${formatearPesos(item.precio_detal)}</td>
+          <td>${formatearPesos(item.precio_mayor)}</td>
           <td>${item.stock_actual}</td>
           <td>${item.stock_minimo}</td>
           <td>
             <span class="badge ${bajoStock ? 'badge-low' : 'badge-ok'}">
-              ${bajoStock ? 'Stock Bajo' : 'OK'}
+              ${bajoStock ? 'Stock bajo' : 'OK'}
             </span>
           </td>
         </tr>
@@ -428,7 +523,7 @@ async function cargarStockTiempoReal() {
   }
 }
 
-// --- HU-06, HU-08, HU-09, HU-10: VENTAS Y FACTURACIÓN ---
+// --- VENTAS Y FACTURACIÓN ---
 
 const selectVentaProducto = document.getElementById('venta-producto');
 const inputVentaCantidad = document.getElementById('venta-cantidad');
@@ -444,12 +539,12 @@ const facturaGenerada = document.getElementById('factura-generada');
 const btnImprimirFactura = document.getElementById('btn-imprimir-factura');
 const btnNuevaVenta = document.getElementById('btn-nueva-venta');
 
-// HU-07: envío de factura por correo
+// Envío de factura por correo
 const inputFacturaCorreo = document.getElementById('factura-correo');
 const btnEnviarCorreo = document.getElementById('btn-enviar-correo');
 const mensajeCorreo = document.getElementById('mensaje-correo');
 
-// HU-12: cliente obligatorio cuando la venta es a crédito
+// Cliente obligatorio cuando la venta es a crédito
 const grupoVentaCliente = document.getElementById('venta-cliente-grupo');
 const selectVentaCliente = document.getElementById('venta-cliente');
 
@@ -509,13 +604,11 @@ btnAgregarItem.addEventListener('click', () => {
   const producto = productosDisponibles.find((p) => p.id === productoId);
 
   if (!producto) {
-    mensajeVenta.textContent = 'Elegí un producto válido.';
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(mensajeVenta, 'Elegí un producto válido.', 'error');
     return;
   }
   if (!Number.isInteger(cantidad) || cantidad <= 0) {
-    mensajeVenta.textContent = 'La cantidad debe ser un número entero mayor a cero.';
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(mensajeVenta, 'La cantidad debe ser un número entero mayor a cero.', 'error');
     return;
   }
 
@@ -523,14 +616,15 @@ btnAgregarItem.addEventListener('click', () => {
   const cantidadYaEnCarrito = existente ? existente.cantidad : 0;
 
   if (cantidadYaEnCarrito + cantidad > producto.stock_actual) {
-    mensajeVenta.textContent = `Stock insuficiente para "${producto.nombre}": disponible ${producto.stock_actual}, ` +
-      `ya tenés ${cantidadYaEnCarrito} en la venta.`;
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(
+      mensajeVenta,
+      `Stock insuficiente para "${producto.nombre}": disponible ${producto.stock_actual}, ya tenés ${cantidadYaEnCarrito} en la venta.`,
+      'error'
+    );
     return;
   }
 
-  mensajeVenta.textContent = '';
-  mensajeVenta.className = 'mensaje';
+  mostrarMensaje(mensajeVenta, '', null);
 
   if (existente) {
     existente.cantidad += cantidad;
@@ -557,9 +651,9 @@ function renderizarCarrito() {
         <tr>
           <td>${escaparHtml(item.nombre)}</td>
           <td>${item.cantidad}</td>
-          <td>$${precioUnitario.toLocaleString()}</td>
-          <td>$${subtotal.toLocaleString()}</td>
-          <td><button type="button" class="btn btn-secondary btn-quitar-item" data-indice="${indice}">Quitar</button></td>
+          <td>${formatearPesos(precioUnitario)}</td>
+          <td>${formatearPesos(subtotal)}</td>
+          <td><button type="button" class="btn btn-secondary btn-sm btn-quitar-item" data-indice="${indice}">Quitar</button></td>
         </tr>
       `;
     })
@@ -591,18 +685,16 @@ function actualizarTotales() {
   const descuento = Number(inputDescuento.value) || 0;
   const total = Math.max(subtotal - descuento, 0);
 
-  document.getElementById('venta-subtotal').textContent = `$${subtotal.toLocaleString()}`;
-  document.getElementById('venta-descuento-resumen').textContent = `$${descuento.toLocaleString()}`;
-  document.getElementById('venta-total').textContent = `$${total.toLocaleString()}`;
+  document.getElementById('venta-subtotal').textContent = formatearPesos(subtotal);
+  document.getElementById('venta-descuento-resumen').textContent = formatearPesos(descuento);
+  document.getElementById('venta-total').textContent = formatearPesos(total);
 }
 
 btnGenerarFactura.addEventListener('click', async () => {
-  mensajeVenta.textContent = '';
-  mensajeVenta.className = 'mensaje';
+  mostrarMensaje(mensajeVenta, '', null);
 
   if (carrito.length === 0) {
-    mensajeVenta.textContent = 'Agregá al menos un producto para generar la factura.';
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(mensajeVenta, 'Agregá al menos un producto para generar la factura.', 'error');
     return;
   }
 
@@ -610,8 +702,7 @@ btnGenerarFactura.addEventListener('click', async () => {
   const clienteId = selectVentaCliente.value ? Number(selectVentaCliente.value) : null;
 
   if (esCredito && !clienteId) {
-    mensajeVenta.textContent = 'Las ventas a crédito deben indicar un cliente.';
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(mensajeVenta, 'Las ventas a crédito deben indicar un cliente.', 'error');
     return;
   }
 
@@ -630,8 +721,7 @@ btnGenerarFactura.addEventListener('click', async () => {
     const data = await res.json();
 
     if (!data.exito) {
-      mensajeVenta.textContent = data.mensaje || 'No se pudo generar la factura.';
-      mensajeVenta.className = 'mensaje error';
+      mostrarMensaje(mensajeVenta, data.mensaje || 'No se pudo generar la factura.', 'error');
       return;
     }
 
@@ -645,8 +735,7 @@ btnGenerarFactura.addEventListener('click', async () => {
     cargarStockTiempoReal();
     cargarAlertasStock();
   } catch (err) {
-    mensajeVenta.textContent = 'Error de conexión al generar la factura.';
-    mensajeVenta.className = 'mensaje error';
+    mostrarMensaje(mensajeVenta, 'Error de conexión al generar la factura.', 'error');
   }
 });
 
@@ -656,20 +745,19 @@ const ETIQUETA_METODO_PAGO = { efectivo: 'Efectivo', transferencia: 'Transferenc
 function mostrarFactura(venta) {
   ventaActualId = venta.id;
   inputFacturaCorreo.value = '';
-  mensajeCorreo.textContent = '';
-  mensajeCorreo.className = 'mensaje';
+  mostrarMensaje(mensajeCorreo, '', null);
 
   aplicarEncabezadoEmpresa();
 
   document.getElementById('factura-id').textContent = venta.id;
-  document.getElementById('factura-fecha').textContent = venta.creado_en;
+  document.getElementById('factura-fecha').textContent = formatearFecha(venta.creado_en);
   document.getElementById('factura-tipo-cliente').textContent = ETIQUETA_TIPO_CLIENTE[venta.tipo_cliente] || venta.tipo_cliente;
   document.getElementById('factura-metodo-pago').textContent = ETIQUETA_METODO_PAGO[venta.metodo_pago] || venta.metodo_pago;
-  document.getElementById('factura-subtotal').textContent = `$${venta.subtotal.toLocaleString()}`;
-  document.getElementById('factura-descuento').textContent = `$${venta.descuento.toLocaleString()}`;
-  document.getElementById('factura-total').textContent = `$${venta.total.toLocaleString()}`;
+  document.getElementById('factura-subtotal').textContent = formatearPesos(venta.subtotal);
+  document.getElementById('factura-descuento').textContent = formatearPesos(venta.descuento);
+  document.getElementById('factura-total').textContent = formatearPesos(venta.total);
   document.getElementById('factura-iva-porcentaje').textContent = venta.ivaPorcentaje;
-  document.getElementById('factura-iva-monto').textContent = `$${venta.ivaMonto.toLocaleString()}`;
+  document.getElementById('factura-iva-monto').textContent = formatearPesos(venta.ivaMonto);
 
   document.getElementById('factura-items').innerHTML = venta.items
     .map(
@@ -677,8 +765,8 @@ function mostrarFactura(venta) {
       <tr>
         <td>${escaparHtml(item.nombre_producto)}</td>
         <td>${item.cantidad}</td>
-        <td>$${item.precio_unitario.toLocaleString()}</td>
-        <td>$${item.subtotal.toLocaleString()}</td>
+        <td>${formatearPesos(item.precio_unitario)}</td>
+        <td>${formatearPesos(item.subtotal)}</td>
       </tr>
     `
     )
@@ -696,21 +784,18 @@ btnNuevaVenta.addEventListener('click', () => {
   ventaActualId = null;
 });
 
-// --- HU-07: ENVIAR FACTURA POR CORREO ---
+// --- ENVIAR FACTURA POR CORREO ---
 btnEnviarCorreo.addEventListener('click', async () => {
-  mensajeCorreo.textContent = '';
-  mensajeCorreo.className = 'mensaje';
+  mostrarMensaje(mensajeCorreo, '', null);
 
   const correoDestino = inputFacturaCorreo.value.trim();
   if (!correoDestino) {
-    mensajeCorreo.textContent = 'Escribí el correo del cliente.';
-    mensajeCorreo.className = 'mensaje error';
+    mostrarMensaje(mensajeCorreo, 'Escribí el correo del cliente.', 'error');
     return;
   }
 
   if (!ventaActualId) {
-    mensajeCorreo.textContent = 'No hay una factura generada para enviar.';
-    mensajeCorreo.className = 'mensaje error';
+    mostrarMensaje(mensajeCorreo, 'No hay una factura generada para enviar.', 'error');
     return;
   }
 
@@ -726,23 +811,20 @@ btnEnviarCorreo.addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeCorreo.textContent = data.mensaje || 'No se pudo enviar el correo.';
-      mensajeCorreo.className = 'mensaje error';
+      mostrarMensaje(mensajeCorreo, data.mensaje || 'No se pudo enviar el correo.', 'error');
       return;
     }
 
-    mensajeCorreo.textContent = `✅ ${data.mensaje || 'Factura enviada por correo.'}`;
-    mensajeCorreo.className = 'mensaje exito';
+    mostrarMensaje(mensajeCorreo, data.mensaje || 'Factura enviada por correo.', 'exito');
   } catch (err) {
-    mensajeCorreo.textContent = 'Error de conexión al enviar el correo.';
-    mensajeCorreo.className = 'mensaje error';
+    mostrarMensaje(mensajeCorreo, 'Error de conexión al enviar el correo.', 'error');
   } finally {
     btnEnviarCorreo.disabled = false;
-    btnEnviarCorreo.textContent = 'Enviar por Correo';
+    btnEnviarCorreo.innerHTML = 'Enviar por correo';
   }
 });
 
-// --- HU-11, HU-12, HU-13: CLIENTES Y CRÉDITOS ---
+// --- CLIENTES Y CRÉDITOS ---
 
 const formCliente = document.getElementById('form-cliente');
 const mensajeCliente = document.getElementById('mensaje-cliente');
@@ -754,11 +836,10 @@ const detalleDeuda = document.getElementById('detalle-deuda');
 const formAbono = document.getElementById('form-abono');
 const mensajeAbono = document.getElementById('mensaje-abono');
 
-// HU-11: registrar cliente
+// Registrar cliente
 formCliente.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeCliente.textContent = '';
-  mensajeCliente.className = 'mensaje';
+  mostrarMensaje(mensajeCliente, '', null);
 
   const payload = {
     nombre: document.getElementById('cliente-nombre').value.trim(),
@@ -777,22 +858,19 @@ formCliente.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeCliente.textContent = data.mensaje || 'Error al registrar el cliente.';
-      mensajeCliente.classList.add('error');
+      mostrarMensaje(mensajeCliente, data.mensaje || 'Error al registrar el cliente.', 'error');
       return;
     }
 
-    mensajeCliente.textContent = `✅ Cliente "${data.cliente.nombre}" registrado (ID: ${data.cliente.id}).`;
-    mensajeCliente.classList.add('exito');
+    mostrarMensaje(mensajeCliente, `Cliente "${data.cliente.nombre}" registrado (N.° ${data.cliente.id}).`, 'exito');
     formCliente.reset();
     cargarClientesParaVenta();
   } catch (err) {
-    mensajeCliente.textContent = 'Error de conexión al guardar el cliente.';
-    mensajeCliente.classList.add('error');
+    mostrarMensaje(mensajeCliente, 'Error de conexión al guardar el cliente.', 'error');
   }
 });
 
-// HU-13: clientes con deuda pendiente
+// Clientes con deuda pendiente
 btnCargarDeudores.addEventListener('click', cargarDeudores);
 
 async function cargarDeudores() {
@@ -805,8 +883,8 @@ async function cargarDeudores() {
       return;
     }
 
-    // HU-13: fila resaltada + insignia cuando la deuda más vieja del
-    // cliente supera los 30 días (en_mora ya viene calculado del backend).
+    // Fila resaltada + insignia cuando la deuda más vieja del cliente supera
+    // los 30 días (en_mora ya viene calculado del backend).
     tablaBodyDeudores.innerHTML = data.clientes
       .map(
         (c) => `
@@ -814,10 +892,10 @@ async function cargarDeudores() {
           <td>${c.id}</td>
           <td>${escaparHtml(c.nombre)}</td>
           <td>${escaparHtml(c.documento) || '—'}</td>
-          <td>$${c.saldo_total.toLocaleString()}</td>
+          <td>${formatearPesos(c.saldo_total)}</td>
           <td>
             ${c.dias_deuda_mas_vieja} día(s)
-            ${c.en_mora ? '<span class="badge badge-low">⚠️ En mora</span>' : ''}
+            ${c.en_mora ? `<span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} En mora</span>` : ''}
           </td>
         </tr>
       `
@@ -828,11 +906,11 @@ async function cargarDeudores() {
   }
 }
 
-// HU-12: detalle de deuda de un cliente (ventas a crédito + abonos)
+// Detalle de deuda de un cliente (ventas a crédito + abonos)
 btnVerDeuda.addEventListener('click', async () => {
   const clienteId = inputDeudaClienteId.value;
   if (!clienteId) {
-    detalleDeuda.innerHTML = '<p class="empty-state">Escribí el ID de un cliente.</p>';
+    detalleDeuda.innerHTML = '<p class="empty-state">Escribí el número de un cliente.</p>';
     return;
   }
 
@@ -841,7 +919,7 @@ btnVerDeuda.addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      detalleDeuda.innerHTML = `<p class="empty-state">${data.mensaje || 'No se pudo consultar la deuda.'}</p>`;
+      detalleDeuda.innerHTML = `<p class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo consultar la deuda.'}</p>`;
       return;
     }
 
@@ -851,11 +929,11 @@ btnVerDeuda.addEventListener('click', async () => {
             (v) => `
           <tr>
             <td>${v.venta_id}</td>
-            <td>${v.creado_en}</td>
-            <td>$${v.total.toLocaleString()}</td>
-            <td>$${v.abonado.toLocaleString()}</td>
-            <td>$${v.saldo.toLocaleString()}</td>
-            <td><button type="button" class="btn btn-secondary btn-ver-factura" data-venta-id="${v.venta_id}">Ver factura</button></td>
+            <td>${formatearFecha(v.creado_en)}</td>
+            <td>${formatearPesos(v.total)}</td>
+            <td>${formatearPesos(v.abonado)}</td>
+            <td>${formatearPesos(v.saldo)}</td>
+            <td><button type="button" class="btn btn-secondary btn-sm btn-ver-factura" data-venta-id="${v.venta_id}">Ver factura</button></td>
           </tr>
         `
           )
@@ -863,14 +941,14 @@ btnVerDeuda.addEventListener('click', async () => {
       : '<tr><td colspan="6" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
 
     const filasAbonos = data.abonos.length
-      ? data.abonos.map((a) => `<li>Venta #${a.venta_id}: $${a.monto.toLocaleString()} (${a.creado_en})</li>`).join('')
+      ? data.abonos.map((a) => `<li>Factura N.° ${a.venta_id}: ${formatearPesos(a.monto)} (${formatearFecha(a.creado_en)})</li>`).join('')
       : '<li class="empty-state">Sin abonos registrados.</li>';
 
     detalleDeuda.innerHTML = `
-      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: <strong>$${data.saldoTotal.toLocaleString()}</strong></p>
+      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: <strong>${formatearPesos(data.saldoTotal)}</strong></p>
       <table class="tabla-inventario">
         <thead>
-          <tr><th>Venta</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Factura</th></tr>
+          <tr><th>Factura</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Ver</th></tr>
         </thead>
         <tbody>${filasVentas}</tbody>
       </table>
@@ -886,8 +964,7 @@ btnVerDeuda.addEventListener('click', async () => {
 // cualquier listado que solo muestre totales (detalle de deuda, listado de
 // reportes). Reutiliza GET /api/ventas/:id — ya trae los items y el
 // desglose de IVA — y mostrarFactura(), la misma función que ya pinta la
-// factura recién generada en HU-06/07: no se duplica el renderizado en
-// ningún lado nuevo.
+// factura recién generada: no se duplica el renderizado en ningún lado nuevo.
 async function verFacturaCompleta(ventaId) {
   try {
     const res = await fetch(`${API_URL}/ventas/${ventaId}`, { headers: obtenerHeaders() });
@@ -914,11 +991,10 @@ detalleDeuda.addEventListener('click', (e) => {
   verFacturaCompleta(boton.dataset.ventaId);
 });
 
-// HU-12: registrar abono
+// Registrar abono
 formAbono.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeAbono.textContent = '';
-  mensajeAbono.className = 'mensaje';
+  mostrarMensaje(mensajeAbono, '', null);
 
   const ventaId = document.getElementById('abono-venta-id').value;
   const monto = Number(document.getElementById('abono-monto').value);
@@ -932,22 +1008,23 @@ formAbono.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeAbono.textContent = data.mensaje || 'No se pudo registrar el abono.';
-      mensajeAbono.classList.add('error');
+      mostrarMensaje(mensajeAbono, data.mensaje || 'No se pudo registrar el abono.', 'error');
       return;
     }
 
-    mensajeAbono.textContent = `✅ Abono registrado. Saldo restante de la venta #${ventaId}: $${data.saldoRestante.toLocaleString()}.`;
-    mensajeAbono.classList.add('exito');
+    mostrarMensaje(
+      mensajeAbono,
+      `Pago registrado. Saldo restante de la factura N.° ${ventaId}: ${formatearPesos(data.saldoRestante)}.`,
+      'exito'
+    );
     formAbono.reset();
     cargarDeudores();
   } catch (err) {
-    mensajeAbono.textContent = 'Error de conexión al registrar el abono.';
-    mensajeAbono.classList.add('error');
+    mostrarMensaje(mensajeAbono, 'Error de conexión al registrar el abono.', 'error');
   }
 });
 
-// --- HU-18: DATOS DE LA EMPRESA ---
+// --- DATOS DE LA EMPRESA ---
 
 const formConfiguracion = document.getElementById('form-configuracion');
 const mensajeConfiguracion = document.getElementById('mensaje-configuracion');
@@ -999,8 +1076,7 @@ function aplicarEncabezadoEmpresa() {
 
 formConfiguracion.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mensajeConfiguracion.textContent = '';
-  mensajeConfiguracion.className = 'mensaje';
+  mostrarMensaje(mensajeConfiguracion, '', null);
 
   const payload = {
     nombreEmpresa: document.getElementById('config-nombre').value.trim(),
@@ -1021,33 +1097,30 @@ formConfiguracion.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeConfiguracion.textContent = data.mensaje || 'No se pudo guardar la configuración.';
-      mensajeConfiguracion.classList.add('error');
+      mostrarMensaje(mensajeConfiguracion, data.mensaje || 'No se pudo guardar la configuración.', 'error');
       return;
     }
 
     configuracionActual = data.configuracion;
-    mensajeConfiguracion.textContent = '✅ Configuración guardada.';
-    mensajeConfiguracion.classList.add('exito');
+    mostrarMensaje(mensajeConfiguracion, 'Configuración guardada.', 'exito');
   } catch (err) {
-    mensajeConfiguracion.textContent = 'Error de conexión al guardar la configuración.';
-    mensajeConfiguracion.classList.add('error');
+    mostrarMensaje(mensajeConfiguracion, 'Error de conexión al guardar la configuración.', 'error');
   }
 });
 
-// --- HU-14, HU-15, HU-16: REPORTES ---
+// --- REPORTES ---
 
 // Mismo resumen (ventas, facturado, recibido, ganancia, desglose por
-// método) para HU-14 y HU-15: la única diferencia es qué rango de fechas
-// se consultó, así que comparten este único renderizador.
+// método) para "hoy" y para un rango: la única diferencia es qué rango de
+// fechas se consultó, así que comparten este único renderizador.
 function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
   const filasMetodo = resumen.porMetodoPago
     .map(
       (m) => `
       <li>
         ${ETIQUETA_METODO_PAGO[m.metodoPago] || m.metodoPago}:
-        ${m.cantidad} venta(s), facturado $${m.totalFacturado.toLocaleString()},
-        recibido $${m.dineroRecibido.toLocaleString()}
+        ${m.cantidad} venta(s), facturado ${formatearPesos(m.totalFacturado)},
+        recibido ${formatearPesos(m.dineroRecibido)}
       </li>`
     )
     .join('');
@@ -1055,11 +1128,11 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
   contenedor.innerHTML = `
     ${encabezado}
     <p>Ventas: <strong>${resumen.cantidadVentas}</strong></p>
-    <p>Total facturado: <strong>$${resumen.totalFacturado.toLocaleString()}</strong></p>
-    <p>Dinero recibido en ventas (efectivo/transferencia): <strong>$${resumen.dineroRecibidoVentas.toLocaleString()}</strong></p>
-    <p>Abonos recibidos (pagos de ventas a crédito): <strong>$${resumen.abonosRecibidos.toLocaleString()}</strong></p>
-    <p>Dinero total recibido en caja: <strong>$${resumen.dineroRecibidoTotal.toLocaleString()}</strong></p>
-    <p>Ganancia: <strong>$${resumen.gananciaTotal.toLocaleString()}</strong>${
+    <p>Total facturado: <strong>${formatearPesos(resumen.totalFacturado)}</strong></p>
+    <p>Dinero recibido en ventas (efectivo/transferencia): <strong>${formatearPesos(resumen.dineroRecibidoVentas)}</strong></p>
+    <p>Abonos recibidos (pagos de ventas a crédito): <strong>${formatearPesos(resumen.abonosRecibidos)}</strong></p>
+    <p>Dinero total recibido en caja: <strong>${formatearPesos(resumen.dineroRecibidoTotal)}</strong></p>
+    <p>Ganancia: <strong>${formatearPesos(resumen.gananciaTotal)}</strong>${
     resumen.gananciaAproximada
       ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
       : ''
@@ -1069,7 +1142,7 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
   `;
 }
 
-// HU-14: ventas y ganancia del día (calendario colombiano, lo resuelve el backend).
+// Ventas y ganancia del día (calendario colombiano, lo resuelve el backend).
 document.getElementById('btn-ventas-hoy').addEventListener('click', async () => {
   const contenedor = document.getElementById('resumen-ventas-hoy');
   contenedor.innerHTML = '<p class="empty-state">Cargando...</p>';
@@ -1079,29 +1152,27 @@ document.getElementById('btn-ventas-hoy').addEventListener('click', async () => 
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      contenedor.innerHTML = `<p class="empty-state">${data.mensaje || 'No se pudo cargar el reporte.'}</p>`;
+      contenedor.innerHTML = `<p class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar el reporte.'}</p>`;
       return;
     }
 
-    renderizarResumenReporte(contenedor, data, `<p>Fecha (Colombia): <strong>${data.fecha}</strong></p>`);
+    renderizarResumenReporte(contenedor, data, `<p>Fecha (Colombia): <strong>${formatearFecha(data.fecha, { conHora: false })}</strong></p>`);
   } catch (err) {
     contenedor.innerHTML = '<p class="empty-state">Error de conexión al cargar el reporte.</p>';
   }
 });
 
-// HU-15: mismo resumen, para un rango de fechas elegido por la usuaria.
+// Mismo resumen, para un rango de fechas elegido por la usuaria.
 document.getElementById('btn-historico').addEventListener('click', async () => {
   const mensajeHistorico = document.getElementById('mensaje-historico');
   const contenedor = document.getElementById('resumen-historico');
-  mensajeHistorico.textContent = '';
-  mensajeHistorico.className = 'mensaje';
+  mostrarMensaje(mensajeHistorico, '', null);
 
   const desde = document.getElementById('historico-desde').value;
   const hasta = document.getElementById('historico-hasta').value;
 
   if (!desde || !hasta) {
-    mensajeHistorico.textContent = 'Elegí ambas fechas (desde y hasta).';
-    mensajeHistorico.classList.add('error');
+    mostrarMensaje(mensajeHistorico, 'Elegí ambas fechas (desde y hasta).', 'error');
     return;
   }
 
@@ -1112,15 +1183,17 @@ document.getElementById('btn-historico').addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeHistorico.textContent = data.mensaje || 'No se pudo consultar el histórico.';
-      mensajeHistorico.classList.add('error');
+      mostrarMensaje(mensajeHistorico, data.mensaje || 'No se pudo consultar el histórico.', 'error');
       return;
     }
 
-    renderizarResumenReporte(contenedor, data, `<p>Rango: <strong>${data.desde}</strong> a <strong>${data.hasta}</strong></p>`);
+    renderizarResumenReporte(
+      contenedor,
+      data,
+      `<p>Rango: <strong>${formatearFecha(data.desde, { conHora: false })}</strong> a <strong>${formatearFecha(data.hasta, { conHora: false })}</strong></p>`
+    );
   } catch (err) {
-    mensajeHistorico.textContent = 'Error de conexión al consultar el histórico.';
-    mensajeHistorico.classList.add('error');
+    mostrarMensaje(mensajeHistorico, 'Error de conexión al consultar el histórico.', 'error');
   }
 });
 
@@ -1132,15 +1205,13 @@ document.getElementById('btn-historico').addEventListener('click', async () => {
 // apuntando a un blob: URL.
 async function exportarReporteHistorico(formato) {
   const mensajeExportar = document.getElementById('mensaje-exportar');
-  mensajeExportar.textContent = '';
-  mensajeExportar.className = 'mensaje';
+  mostrarMensaje(mensajeExportar, '', null);
 
   const desde = document.getElementById('historico-desde').value;
   const hasta = document.getElementById('historico-hasta').value;
 
   if (!desde || !hasta) {
-    mensajeExportar.textContent = 'Elegí ambas fechas (desde y hasta) para exportar.';
-    mensajeExportar.classList.add('error');
+    mostrarMensaje(mensajeExportar, 'Elegí ambas fechas (desde y hasta) para exportar.', 'error');
     return;
   }
 
@@ -1151,8 +1222,7 @@ async function exportarReporteHistorico(formato) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      mensajeExportar.textContent = (data && data.mensaje) || 'No se pudo exportar el reporte.';
-      mensajeExportar.classList.add('error');
+      mostrarMensaje(mensajeExportar, (data && data.mensaje) || 'No se pudo exportar el reporte.', 'error');
       return;
     }
 
@@ -1167,18 +1237,17 @@ async function exportarReporteHistorico(formato) {
     enlace.remove();
     window.URL.revokeObjectURL(url);
   } catch (err) {
-    mensajeExportar.textContent = 'Error de conexión al exportar el reporte.';
-    mensajeExportar.classList.add('error');
+    mostrarMensaje(mensajeExportar, 'Error de conexión al exportar el reporte.', 'error');
   }
 }
 
 document.getElementById('btn-exportar-excel').addEventListener('click', () => exportarReporteHistorico('excel'));
 document.getElementById('btn-exportar-pdf').addEventListener('click', () => exportarReporteHistorico('pdf'));
 
-// Listado de ventas individuales que componen un reporte (HU-14/HU-15):
-// misma tabla para ambos casos, con un botón "Ver factura" por fila que
-// reutiliza verFacturaCompleta() (la misma función que ya usa el detalle de
-// deuda de un cliente).
+// Listado de ventas individuales que componen un reporte (día/rango): misma
+// tabla para ambos casos, con un botón "Ver factura" por fila que reutiliza
+// verFacturaCompleta() (la misma función que ya usa el detalle de deuda de
+// un cliente).
 function renderizarListadoVentas(tbody, ventas) {
   if (!ventas || ventas.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Sin ventas en este rango.</td></tr>';
@@ -1190,11 +1259,11 @@ function renderizarListadoVentas(tbody, ventas) {
       (v) => `
       <tr>
         <td>${v.id}</td>
-        <td>${v.creado_en}</td>
+        <td>${formatearFecha(v.creado_en)}</td>
         <td>${escaparHtml(v.nombre_cliente) || 'Mostrador'}</td>
         <td>${ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago}</td>
-        <td>$${v.total.toLocaleString()}</td>
-        <td><button type="button" class="btn btn-secondary btn-ver-factura" data-venta-id="${v.id}">Ver factura</button></td>
+        <td>${formatearPesos(v.total)}</td>
+        <td><button type="button" class="btn btn-secondary btn-sm btn-ver-factura" data-venta-id="${v.id}">Ver factura</button></td>
       </tr>
     `
     )
@@ -1210,7 +1279,7 @@ document.getElementById('btn-listado-ventas-hoy').addEventListener('click', asyn
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${data.mensaje || 'No se pudo cargar el listado.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar el listado.'}</td></tr>`;
       return;
     }
 
@@ -1239,7 +1308,7 @@ document.getElementById('btn-listado-historico').addEventListener('click', async
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${data.mensaje || 'No se pudo cargar el listado.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar el listado.'}</td></tr>`;
       return;
     }
 
@@ -1263,12 +1332,11 @@ document.getElementById('tabla-body-listado-historico').addEventListener('click'
   verFacturaCompleta(boton.dataset.ventaId);
 });
 
-// HU-16: ranking de productos más vendidos, con rango de fechas opcional.
+// Ranking de productos más vendidos, con rango de fechas opcional.
 document.getElementById('btn-ranking').addEventListener('click', async () => {
   const mensajeRanking = document.getElementById('mensaje-ranking');
   const tablaRanking = document.getElementById('tabla-body-ranking');
-  mensajeRanking.textContent = '';
-  mensajeRanking.className = 'mensaje';
+  mostrarMensaje(mensajeRanking, '', null);
 
   const desde = document.getElementById('ranking-desde').value;
   const hasta = document.getElementById('ranking-hasta').value;
@@ -1281,8 +1349,7 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeRanking.textContent = data.mensaje || 'No se pudo consultar el ranking.';
-      mensajeRanking.classList.add('error');
+      mostrarMensaje(mensajeRanking, data.mensaje || 'No se pudo consultar el ranking.', 'error');
       return;
     }
 
@@ -1297,14 +1364,13 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
         <tr>
           <td>${escaparHtml(p.nombre)}</td>
           <td>${p.unidades_vendidas}</td>
-          <td>$${p.ingreso_generado.toLocaleString()}</td>
+          <td>${formatearPesos(p.ingreso_generado)}</td>
         </tr>
       `
       )
       .join('');
   } catch (err) {
-    mensajeRanking.textContent = 'Error de conexión al consultar el ranking.';
-    mensajeRanking.classList.add('error');
+    mostrarMensaje(mensajeRanking, 'Error de conexión al consultar el ranking.', 'error');
   }
 });
 
@@ -1338,8 +1404,7 @@ document.getElementById('btn-auditoria').addEventListener('click', cargarAuditor
 async function cargarAuditoria() {
   const mensajeAuditoria = document.getElementById('mensaje-auditoria');
   const tablaAuditoria = document.getElementById('tabla-body-auditoria');
-  mensajeAuditoria.textContent = '';
-  mensajeAuditoria.className = 'mensaje';
+  mostrarMensaje(mensajeAuditoria, '', null);
 
   const desde = document.getElementById('auditoria-desde').value;
   const hasta = document.getElementById('auditoria-hasta').value;
@@ -1358,8 +1423,7 @@ async function cargarAuditoria() {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mensajeAuditoria.textContent = data.mensaje || 'No se pudo consultar el registro de auditoría.';
-      mensajeAuditoria.classList.add('error');
+      mostrarMensaje(mensajeAuditoria, data.mensaje || 'No se pudo consultar el registro de auditoría.', 'error');
       tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Sin datos.</td></tr>';
       return;
     }
@@ -1373,7 +1437,7 @@ async function cargarAuditoria() {
       .map(
         (evento) => `
         <tr>
-          <td>${evento.creado_en}</td>
+          <td>${formatearFecha(evento.creado_en)}</td>
           <td>${escaparHtml(evento.usuario)}</td>
           <td>${escaparHtml(evento.accion)}</td>
           <td>${escaparHtml(evento.entidad)}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
@@ -1384,8 +1448,7 @@ async function cargarAuditoria() {
       )
       .join('');
   } catch (err) {
-    mensajeAuditoria.textContent = 'Error de conexión al consultar el registro de auditoría.';
-    mensajeAuditoria.classList.add('error');
+    mostrarMensaje(mensajeAuditoria, 'Error de conexión al consultar el registro de auditoría.', 'error');
     tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Sin datos.</td></tr>';
   }
 }

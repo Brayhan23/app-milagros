@@ -3,22 +3,144 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App Milagros — Gestión de Inventario</title>
+  <title>Milagros — Punto de Venta</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- Vista: Login (HU-01) -->
+  <!-- Sprite de iconos (Lucide, incrustado localmente): una sola definición
+       por icono, referenciada en todo el resto de la página con
+       <svg class="icon"><use href="#icon-NOMBRE"></use></svg>. Nunca se
+       copia el SVG completo en más de un lugar. -->
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="icon-tag" viewBox="0 0 24 24">
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+      <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-receipt" viewBox="0 0 24 24">
+      <path d="M12 17V7" />
+      <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" />
+      <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" />
+    </symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <circle cx="9" cy="7" r="4" />
+    </symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24">
+      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+      <circle cx="12" cy="12" r="3" />
+    </symbol>
+    <symbol id="icon-bar-chart-3" viewBox="0 0 24 24">
+      <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+      <path d="M18 17V9" />
+      <path d="M13 17V5" />
+      <path d="M8 17v-3" />
+    </symbol>
+    <symbol id="icon-history" viewBox="0 0 24 24">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </symbol>
+    <symbol id="icon-alert-triangle" viewBox="0 0 24 24">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </symbol>
+    <symbol id="icon-package" viewBox="0 0 24 24">
+      <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
+      <path d="M12 22V12" />
+      <polyline points="3.29 7 12 12 20.71 7" />
+      <path d="m7.5 4.27 9 5.15" />
+    </symbol>
+    <symbol id="icon-wallet" viewBox="0 0 24 24">
+      <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </symbol>
+    <symbol id="icon-file-text" viewBox="0 0 24 24">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+      <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+      <path d="M10 9H8" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+    </symbol>
+    <symbol id="icon-banknote" viewBox="0 0 24 24">
+      <rect width="20" height="12" x="2" y="6" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 12h.01M18 12h.01" />
+    </symbol>
+    <symbol id="icon-calendar" viewBox="0 0 24 24">
+      <path d="M8 2v3" />
+      <path d="M16 2v3" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18" />
+    </symbol>
+    <symbol id="icon-trending-up" viewBox="0 0 24 24">
+      <path d="M16 7h6v6" />
+      <path d="m22 7-8.5 8.5-5-5L2 17" />
+    </symbol>
+    <symbol id="icon-trophy" viewBox="0 0 24 24">
+      <path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" />
+      <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" />
+      <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" />
+      <path d="M4 22h16" />
+      <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+      <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" />
+    </symbol>
+    <symbol id="icon-file-spreadsheet" viewBox="0 0 24 24">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+      <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+      <path d="M8 13h2" />
+      <path d="M14 13h2" />
+      <path d="M8 17h2" />
+      <path d="M14 17h2" />
+    </symbol>
+    <symbol id="icon-file-down" viewBox="0 0 24 24">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+      <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+      <path d="M12 18v-6" />
+      <path d="m9 15 3 3 3-3" />
+    </symbol>
+    <symbol id="icon-circle-check" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </symbol>
+    <symbol id="icon-alert-circle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" x2="12" y1="8" y2="12" />
+      <line x1="12" x2="12.01" y1="16" y2="16" />
+    </symbol>
+    <symbol id="icon-log-out" viewBox="0 0 24 24">
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    </symbol>
+    <symbol id="icon-image-off" viewBox="0 0 24 24">
+      <line x1="2" x2="22" y1="2" y2="22" />
+      <path d="M10.41 10.41a2 2 0 1 1-2.83-2.83" />
+      <line x1="13.5" x2="6" y1="13.5" y2="21" />
+      <line x1="18" x2="21" y1="12" y2="15" />
+      <path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59" />
+      <path d="M21 15V5a2 2 0 0 0-2-2H9" />
+    </symbol>
+  </svg>
+
+  <!-- Vista: Login -->
   <div id="vista-login" class="login-container">
     <div id="tarjeta-login" class="card login-card">
       <div class="header-login">
         <h1>Milagros</h1>
-        <p>Iniciar Sesión</p>
+        <p>Iniciar sesión</p>
       </div>
       <form id="form-login">
         <div class="form-group">
           <label for="login-usuario">Usuario</label>
-          <input type="text" id="login-usuario" placeholder="Ingrese usuario" required>
+          <input type="text" id="login-usuario" placeholder="Ingresa tu usuario" required>
         </div>
         <div class="form-group">
           <label for="login-password">Contraseña</label>
@@ -77,51 +199,64 @@
     </div>
   </div>
 
-  <!-- Vista: Panel Principal (HU-02, HU-03, HU-04, HU-05) -->
+  <!-- Vista: Panel Principal -->
   <div id="vista-panel" class="hidden">
     <header class="header">
       <div class="header-content">
-        <div>
-          <h1>Milagros — Control de Inventario</h1>
-          <p class="subtitle">Módulo de Autenticación, Productos y Stock</p>
+        <div class="header-marca">
+          <img id="header-logo" class="header-logo" src="uploads/logo.png" alt="Logo de Milagros">
+          <div id="header-logo-reserva" class="header-logo-reserva hidden" aria-hidden="true">
+            <svg class="icon"><use href="#icon-image-off"></use></svg>
+          </div>
+          <div class="header-texto">
+            <h1>Milagros</h1>
+            <p>Distribuidora Oficial San Roque, Antioquia</p>
+          </div>
         </div>
-        <button id="btn-logout" class="btn btn-logout">Cerrar Sesión</button>
+        <div class="header-usuario">
+          <span id="header-usuario-nombre" class="header-usuario-nombre hidden">
+            <svg class="icon icon-sm"><use href="#icon-user"></use></svg>
+            <span id="header-usuario-texto"></span>
+          </span>
+          <button id="btn-logout" type="button" class="btn btn-neutral btn-sm">
+            <svg class="icon icon-sm"><use href="#icon-log-out"></use></svg>
+            Cerrar sesión
+          </button>
+        </div>
       </div>
     </header>
 
     <main class="container">
 
       <nav class="tabs">
-        <button type="button" class="tab-btn active" data-tab="productos">🏷️ Productos</button>
-        <button type="button" class="tab-btn" data-tab="facturas">🧾 Facturas</button>
-        <button type="button" class="tab-btn" data-tab="clientes">👤 Clientes</button>
-        <button type="button" class="tab-btn" data-tab="configuracion">⚙️ Configuración</button>
-        <button type="button" class="tab-btn" data-tab="reportes">📊 Reportes</button>
-        <button type="button" class="tab-btn" data-tab="auditoria">🔍 Auditoría</button>
+        <button type="button" class="tab-btn active" data-tab="productos"><svg class="icon icon-sm"><use href="#icon-tag"></use></svg> Productos</button>
+        <button type="button" class="tab-btn" data-tab="facturas"><svg class="icon icon-sm"><use href="#icon-receipt"></use></svg> Facturas</button>
+        <button type="button" class="tab-btn" data-tab="clientes"><svg class="icon icon-sm"><use href="#icon-users"></use></svg> Clientes</button>
+        <button type="button" class="tab-btn" data-tab="configuracion"><svg class="icon icon-sm"><use href="#icon-settings"></use></svg> Configuración</button>
+        <button type="button" class="tab-btn" data-tab="reportes"><svg class="icon icon-sm"><use href="#icon-bar-chart-3"></use></svg> Reportes</button>
+        <button type="button" class="tab-btn" data-tab="auditoria"><svg class="icon icon-sm"><use href="#icon-history"></use></svg> Auditoría</button>
       </nav>
 
-      <!-- Pestaña: Productos (HU-02, HU-03, HU-04, HU-05) -->
+      <!-- Pestaña: Productos -->
       <div id="tab-productos" class="tab-panel">
 
-        <!-- HU-04: Alertas de Stock Bajo -->
         <section class="card alert-card">
-          <h2>⚠️ Alertas de Stock Bajo (HU-04)</h2>
-          <button id="btn-actualizar-alertas" class="btn btn-secondary">Refrescar Alertas</button>
+          <h2><svg class="icon"><use href="#icon-alert-triangle"></use></svg> Productos por agotarse</h2>
+          <button id="btn-actualizar-alertas" type="button" class="btn btn-secondary">Refrescar alertas</button>
           <div id="contenedor-alertas" class="alertas-grid">
             <p class="empty-state">Cargando alertas...</p>
           </div>
         </section>
 
-        <!-- HU-02: Registrar Nuevo Producto con Código de Barras -->
         <section class="card">
-          <h2>🏷️ Registrar Nuevo Producto (HU-02)</h2>
+          <h2><svg class="icon"><use href="#icon-tag"></use></svg> Agregar producto nuevo</h2>
           <form id="form-producto" class="form-grid-2col">
             <div class="form-group">
-              <label for="prod-codigo">Código de Barras</label>
+              <label for="prod-codigo">Código de barras</label>
               <input type="text" id="prod-codigo" placeholder="Ej: 7701234567890">
             </div>
             <div class="form-group">
-              <label for="prod-nombre">Nombre del Producto *</label>
+              <label for="prod-nombre">Nombre del producto *</label>
               <input type="text" id="prod-nombre" placeholder="Ej: Jabón de Rosas" required>
             </div>
             <div class="form-group span-2">
@@ -129,62 +264,60 @@
               <input type="text" id="prod-descripcion" placeholder="Descripción breve">
             </div>
             <div class="form-group">
-              <label for="prod-pcompra">Precio de Compra ($)</label>
+              <label for="prod-pcompra">Precio de compra ($)</label>
               <input type="number" id="prod-pcompra" placeholder="0" min="0" required>
             </div>
             <div class="form-group">
-              <label for="prod-pdetal">Precio al Detal ($)</label>
+              <label for="prod-pdetal">Precio al detal ($)</label>
               <input type="number" id="prod-pdetal" placeholder="0" min="0" required>
             </div>
             <div class="form-group">
-              <label for="prod-pmayor">Precio al Por Mayor ($)</label>
+              <label for="prod-pmayor">Precio al por mayor ($)</label>
               <input type="number" id="prod-pmayor" placeholder="0" min="0" required>
             </div>
             <div class="form-group">
-              <label for="prod-stock-inicial">Stock Inicial</label>
+              <label for="prod-stock-inicial">Stock inicial</label>
               <input type="number" id="prod-stock-inicial" placeholder="0" min="0" value="0">
             </div>
             <div class="form-group">
-              <label for="prod-stock-minimo">Stock Mínimo (Alerta)</label>
+              <label for="prod-stock-minimo">Stock mínimo (para la alerta)</label>
               <input type="number" id="prod-stock-minimo" placeholder="0" min="0" value="5">
             </div>
             <div class="form-actions span-2">
-              <button type="submit" class="btn btn-primary">Guardar Producto</button>
+              <button type="submit" class="btn btn-primary">Guardar producto</button>
             </div>
           </form>
           <div id="mensaje-producto" class="mensaje"></div>
         </section>
 
-        <!-- HU-03: Registrar Entrada de Stock -->
         <section class="card">
-          <h2>📦 Registrar Entrada de Stock (HU-03)</h2>
+          <h2><svg class="icon"><use href="#icon-package"></use></svg> Ingresar mercancía</h2>
           <form id="form-stock" class="form-grid-3col">
             <div class="form-group">
-              <label for="stock-producto-id">ID del Producto</label>
+              <label for="stock-producto-id">Número del producto</label>
               <input type="number" id="stock-producto-id" placeholder="Ej: 1" required>
             </div>
             <div class="form-group">
-              <label for="stock-cantidad">Cantidad Entrante</label>
+              <label for="stock-cantidad">Cantidad que llegó</label>
               <input type="number" id="stock-cantidad" min="1" placeholder="Ej: 10" required>
             </div>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Sumar al Stock</button>
+              <button type="submit" class="btn btn-primary">Sumar al stock</button>
             </div>
           </form>
           <div id="mensaje-stock" class="mensaje"></div>
         </section>
 
-        <!-- HU-05: Ver Stock en Tiempo Real -->
         <section class="card">
           <div class="card-header">
-            <h2>📊 Stock Disponible en Tiempo Real (HU-05)</h2>
-            <button id="btn-cargar-stock" class="btn btn-secondary">Actualizar Lista</button>
+            <h2><svg class="icon"><use href="#icon-package"></use></svg> Inventario</h2>
+            <button id="btn-cargar-stock" type="button" class="btn btn-secondary">Actualizar lista</button>
           </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>N.°</th>
                   <th>Código</th>
                   <th>Producto</th>
                   <th>P. Compra</th>
@@ -206,12 +339,12 @@
 
       </div>
 
-      <!-- Pestaña: Facturas (HU-06, HU-08, HU-09, HU-10) -->
+      <!-- Pestaña: Facturas -->
       <div id="tab-facturas" class="tab-panel hidden">
 
         <!-- Armar la venta -->
         <section class="card no-print">
-          <h2>🧾 Nueva Venta</h2>
+          <h2><svg class="icon"><use href="#icon-receipt"></use></svg> Nueva venta</h2>
 
           <div class="form-grid-3col">
             <div class="form-group">
@@ -248,14 +381,14 @@
 
           <div class="form-grid-3col venta-totales">
             <div class="form-group">
-              <label for="venta-tipo-cliente">Tipo de Cliente</label>
+              <label for="venta-tipo-cliente">Tipo de cliente</label>
               <select id="venta-tipo-cliente">
                 <option value="detal">Detal</option>
                 <option value="mayor">Mayor</option>
               </select>
             </div>
             <div class="form-group">
-              <label for="venta-metodo-pago">Método de Pago</label>
+              <label for="venta-metodo-pago">Método de pago</label>
               <select id="venta-metodo-pago">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
@@ -268,7 +401,7 @@
             </div>
           </div>
 
-          <!-- HU-12: obligatorio solo cuando el método de pago es crédito -->
+          <!-- Obligatorio solo cuando el método de pago es crédito -->
           <div class="form-group hidden" id="venta-cliente-grupo">
             <label for="venta-cliente">Cliente (obligatorio para venta a crédito)</label>
             <select id="venta-cliente"></select>
@@ -281,7 +414,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" id="btn-generar-factura" class="btn btn-primary">Generar Factura</button>
+            <button type="button" id="btn-generar-factura" class="btn btn-primary">Generar factura</button>
           </div>
           <div id="mensaje-venta" class="mensaje"></div>
         </section>
@@ -292,8 +425,8 @@
             <div>
               <img id="factura-logo" class="factura-logo hidden" alt="Logo de la empresa">
               <h2 id="factura-empresa-nombre">Milagros</h2>
-              <p id="factura-empresa-datos" class="subtitle"></p>
-              <p class="subtitle">Comprobante de Venta</p>
+              <p id="factura-empresa-datos" class="empty-state"></p>
+              <p class="empty-state">Comprobante de venta</p>
             </div>
             <div class="factura-meta">
               <p>Factura N.° <strong id="factura-id"></strong></p>
@@ -314,8 +447,8 @@
           </table>
 
           <div class="resumen-totales">
-            <p>Tipo de Cliente: <strong id="factura-tipo-cliente"></strong></p>
-            <p>Método de Pago: <strong id="factura-metodo-pago"></strong></p>
+            <p>Tipo de cliente: <strong id="factura-tipo-cliente"></strong></p>
+            <p>Método de pago: <strong id="factura-metodo-pago"></strong></p>
             <p>Subtotal: <strong id="factura-subtotal"></strong></p>
             <p>Descuento: <strong id="factura-descuento"></strong></p>
             <p class="total-final">Total: <strong id="factura-total"></strong></p>
@@ -324,17 +457,17 @@
 
           <div class="form-actions no-print">
             <button type="button" id="btn-imprimir-factura" class="btn btn-primary">Imprimir</button>
-            <button type="button" id="btn-nueva-venta" class="btn btn-secondary">Nueva Venta</button>
+            <button type="button" id="btn-nueva-venta" class="btn btn-secondary">Nueva venta</button>
           </div>
 
-          <!-- HU-07: Enviar copia de la factura por correo -->
+          <!-- Enviar copia de la factura por correo -->
           <div class="no-print factura-email">
             <div class="form-group">
               <label for="factura-correo">Enviar copia por correo</label>
               <input type="email" id="factura-correo" placeholder="cliente@correo.com">
             </div>
             <div class="form-actions">
-              <button type="button" id="btn-enviar-correo" class="btn btn-secondary">Enviar por Correo</button>
+              <button type="button" id="btn-enviar-correo" class="btn btn-secondary">Enviar por correo</button>
             </div>
             <div id="mensaje-correo" class="mensaje"></div>
           </div>
@@ -342,12 +475,11 @@
 
       </div>
 
-      <!-- Pestaña: Clientes y créditos (HU-11, HU-12, HU-13) -->
+      <!-- Pestaña: Clientes y créditos -->
       <div id="tab-clientes" class="tab-panel hidden">
 
-        <!-- HU-11: Registrar cliente -->
         <section class="card">
-          <h2>👤 Registrar Cliente (HU-11)</h2>
+          <h2><svg class="icon"><use href="#icon-user"></use></svg> Agregar cliente</h2>
           <form id="form-cliente" class="form-grid-2col">
             <div class="form-group">
               <label for="cliente-nombre">Nombre *</label>
@@ -366,31 +498,30 @@
               <input type="email" id="cliente-correo" placeholder="cliente@correo.com">
             </div>
             <div class="form-group">
-              <label for="cliente-mayorista">
+              <label for="cliente-mayorista" class="form-check">
                 <input type="checkbox" id="cliente-mayorista"> Es cliente mayorista
               </label>
             </div>
             <div class="form-actions span-2">
-              <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+              <button type="submit" class="btn btn-primary">Guardar cliente</button>
             </div>
           </form>
           <div id="mensaje-cliente" class="mensaje"></div>
         </section>
 
-        <!-- HU-13: Clientes con deuda pendiente -->
         <section class="card">
           <div class="card-header">
-            <h2>💰 Clientes con Deuda Pendiente (HU-13)</h2>
-            <button id="btn-cargar-deudores" class="btn btn-secondary">Actualizar Lista</button>
+            <h2><svg class="icon"><use href="#icon-wallet"></use></svg> Clientes que deben</h2>
+            <button id="btn-cargar-deudores" type="button" class="btn btn-secondary">Actualizar lista</button>
           </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>N.°</th>
                   <th>Cliente</th>
                   <th>Documento</th>
-                  <th>Saldo Pendiente</th>
+                  <th>Saldo pendiente</th>
                   <th>Antigüedad</th>
                 </tr>
               </thead>
@@ -403,36 +534,34 @@
           </div>
         </section>
 
-        <!-- HU-12: Detalle de deuda de un cliente -->
         <section class="card">
-          <h2>📄 Detalle de Deuda de un Cliente</h2>
+          <h2><svg class="icon"><use href="#icon-file-text"></use></svg> Buscar deuda de un cliente</h2>
           <div class="form-grid-3col">
             <div class="form-group">
-              <label for="deuda-cliente-id">ID del Cliente</label>
+              <label for="deuda-cliente-id">Número del cliente</label>
               <input type="number" id="deuda-cliente-id" placeholder="Ej: 1">
             </div>
             <div class="form-actions">
               <button type="button" id="btn-ver-deuda" class="btn btn-secondary">Consultar</button>
             </div>
           </div>
-          <p class="empty-state">"Ver factura" abre el comprobante completo en la pestaña Facturas (mismo detalle que al generar la venta).</p>
+          <p class="empty-state">"Ver factura" abre el comprobante completo en la pestaña Facturas.</p>
           <div id="detalle-deuda"></div>
         </section>
 
-        <!-- HU-12: Registrar abono -->
         <section class="card">
-          <h2>💵 Registrar Abono</h2>
+          <h2><svg class="icon"><use href="#icon-banknote"></use></svg> Registrar pago (abono)</h2>
           <form id="form-abono" class="form-grid-3col">
             <div class="form-group">
-              <label for="abono-venta-id">ID de la Venta (a crédito)</label>
+              <label for="abono-venta-id">Número de la factura (a crédito)</label>
               <input type="number" id="abono-venta-id" placeholder="Ej: 3" required>
             </div>
             <div class="form-group">
-              <label for="abono-monto">Monto del Abono ($)</label>
+              <label for="abono-monto">Monto del pago ($)</label>
               <input type="number" id="abono-monto" min="1" placeholder="Ej: 20000" required>
             </div>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Registrar Abono</button>
+              <button type="submit" class="btn btn-primary">Registrar pago</button>
             </div>
           </form>
           <div id="mensaje-abono" class="mensaje"></div>
@@ -440,14 +569,14 @@
 
       </div>
 
-      <!-- Pestaña: Configuración de la empresa (HU-18) -->
+      <!-- Pestaña: Configuración de la empresa -->
       <div id="tab-configuracion" class="tab-panel hidden">
         <section class="card">
-          <h2>⚙️ Datos de la Empresa (HU-18)</h2>
-          <p class="empty-state">Estos datos aparecen en el encabezado de cada factura impresa y del correo (HU-06/HU-07).</p>
+          <h2><svg class="icon"><use href="#icon-settings"></use></svg> Datos de tu negocio</h2>
+          <p class="card-intro">Estos datos aparecen en el encabezado de cada factura impresa y del correo.</p>
           <form id="form-configuracion" class="form-grid-2col">
             <div class="form-group">
-              <label for="config-nombre">Nombre de la Empresa *</label>
+              <label for="config-nombre">Nombre de la empresa *</label>
               <input type="text" id="config-nombre" required>
             </div>
             <div class="form-group">
@@ -467,7 +596,7 @@
               <input type="email" id="config-correo">
             </div>
             <div class="form-group span-2">
-              <label for="config-logo">Ruta o URL del Logo</label>
+              <label for="config-logo">Ruta o URL del logo</label>
               <input type="text" id="config-logo" placeholder="Ej: uploads/logo.png">
             </div>
             <div class="form-group">
@@ -475,27 +604,26 @@
               <input type="number" id="config-iva" min="0" max="100" step="1" placeholder="Ej: 19">
             </div>
             <div class="form-actions span-2">
-              <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+              <button type="submit" class="btn btn-primary">Guardar configuración</button>
             </div>
           </form>
           <div id="mensaje-configuracion" class="mensaje"></div>
         </section>
       </div>
 
-      <!-- Pestaña: Reportes (HU-14, HU-15, HU-16) -->
+      <!-- Pestaña: Reportes -->
       <div id="tab-reportes" class="tab-panel hidden">
 
-        <!-- HU-14: Ventas y ganancia del día -->
         <section class="card">
           <div class="card-header">
-            <h2>📅 Ventas y Ganancia del Día (HU-14)</h2>
-            <button type="button" id="btn-ventas-hoy" class="btn btn-secondary">Cargar Hoy</button>
+            <h2><svg class="icon"><use href="#icon-calendar"></use></svg> Ventas de hoy</h2>
+            <button type="button" id="btn-ventas-hoy" class="btn btn-secondary">Cargar hoy</button>
           </div>
           <div id="resumen-ventas-hoy" class="empty-state">Sin cargar todavía.</div>
 
           <div class="card-header">
             <h2 class="subtitle">Ventas individuales de hoy</h2>
-            <button type="button" id="btn-listado-ventas-hoy" class="btn btn-secondary">Ver Ventas del Día</button>
+            <button type="button" id="btn-listado-ventas-hoy" class="btn btn-secondary">Ver ventas del día</button>
           </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
@@ -509,9 +637,8 @@
           </div>
         </section>
 
-        <!-- HU-15: Histórico por rango de fechas -->
         <section class="card">
-          <h2>📈 Histórico por Rango de Fechas (HU-15)</h2>
+          <h2><svg class="icon"><use href="#icon-trending-up"></use></svg> Ventas por fechas</h2>
           <div class="form-grid-3col">
             <div class="form-group">
               <label for="historico-desde">Desde</label>
@@ -529,15 +656,15 @@
           <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
 
           <div class="form-actions">
-            <button type="button" id="btn-exportar-excel" class="btn btn-secondary">📊 Exportar Excel</button>
-            <button type="button" id="btn-exportar-pdf" class="btn btn-secondary">📄 Exportar PDF</button>
+            <button type="button" id="btn-exportar-excel" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-spreadsheet"></use></svg> Exportar Excel</button>
+            <button type="button" id="btn-exportar-pdf" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-down"></use></svg> Exportar PDF</button>
           </div>
           <p class="empty-state">Usa las mismas fechas Desde/Hasta de arriba. El archivo no incluye la ganancia del negocio.</p>
           <div id="mensaje-exportar" class="mensaje"></div>
 
           <div class="card-header">
             <h2 class="subtitle">Ventas individuales del rango</h2>
-            <button type="button" id="btn-listado-historico" class="btn btn-secondary">Ver Ventas del Rango</button>
+            <button type="button" id="btn-listado-historico" class="btn btn-secondary">Ver ventas del rango</button>
           </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
@@ -551,9 +678,8 @@
           </div>
         </section>
 
-        <!-- HU-16: Productos más vendidos -->
         <section class="card">
-          <h2>🏆 Productos Más Vendidos (HU-16)</h2>
+          <h2><svg class="icon"><use href="#icon-trophy"></use></svg> Lo más vendido</h2>
           <div class="form-grid-3col">
             <div class="form-group">
               <label for="ranking-desde">Desde (opcional)</label>
@@ -573,8 +699,8 @@
               <thead>
                 <tr>
                   <th>Producto</th>
-                  <th>Unidades Vendidas</th>
-                  <th>Ingreso Generado</th>
+                  <th>Unidades vendidas</th>
+                  <th>Ingreso generado</th>
                 </tr>
               </thead>
               <tbody id="tabla-body-ranking">
@@ -588,11 +714,11 @@
 
       </div>
 
-      <!-- Pestaña: Auditoría (registro de auditoría, solo lectura) -->
+      <!-- Pestaña: Auditoría (registro de actividad, solo lectura) -->
       <div id="tab-auditoria" class="tab-panel hidden">
         <section class="card">
-          <h2>🔍 Registro de Auditoría</h2>
-          <p class="empty-state">Trazabilidad de acciones sensibles: quién hizo qué y cuándo. Solo lectura.</p>
+          <h2><svg class="icon"><use href="#icon-history"></use></svg> Registro de actividad</h2>
+          <p class="card-intro">Quién hizo qué y cuándo, para consulta. Solo lectura.</p>
           <div class="form-grid-3col">
             <div class="form-group">
               <label for="auditoria-desde">Desde</label>
@@ -607,7 +733,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="auditoria-accion">Acción</label>
+            <label for="auditoria-accion">Tipo de acción</label>
             <select id="auditoria-accion">
               <option value="">Todas</option>
             </select>
@@ -620,7 +746,7 @@
                   <th>Fecha</th>
                   <th>Usuario</th>
                   <th>Acción</th>
-                  <th>Entidad</th>
+                  <th>Sobre</th>
                   <th>Detalle</th>
                   <th>IP</th>
                 </tr>

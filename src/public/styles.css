@@ -1,172 +1,603 @@
-/* Paleta y base */
+/* ==========================================================================
+   App Milagros — Sistema de diseño
+   Paleta, tipografía y espaciado según .claude/skills/milagros-ui/SKILL.md.
+   Un solo archivo, organizado por secciones — sin capas acumuladas.
+   ========================================================================== */
+
+/* --- 1. Variables ------------------------------------------------------- */
 :root {
-  --rosado-oscuro: #c2185b;
-  --rosado-medio: #f8bbd0;
-  --rosado-claro: #fce4ec;
-  --texto: #2e2e2e;
-  --texto-suave: #767676;
-  --borde: #e3e3e3;
-  --fondo: #fdf7f8;
+  /* Marca */
+  --rosa: #c2185b;
+  --rosa-oscuro: #a01650; /* hover de botón primario */
+  --rosa-claro: #fdf2f5;
+  --lila: #dac9df;
+  --verde-menta: #d0fdd7;
+
+  /* Neutros */
+  --texto: #2b2b2b;
+  --texto-suave: #6b6b6b;
+  --borde: #e8e0e4;
   --blanco: #ffffff;
-  --exito: #2e7d32;
-  --exito-fondo: #e8f5e9;
+
+  /* Estados (derivados de la paleta) */
+  --exito: #1e7a34; /* texto sobre --verde-menta: mismo tono, con contraste suficiente */
+  --exito-fondo: var(--verde-menta);
+  --alerta: #f5a623;
+  --alerta-fondo: #fef3e0;
   --error: #c62828;
-  --error-fondo: #fdecea;
-  --alerta: #ef6c00;
-  --alerta-fondo: #fff3e0;
-  --sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --error-fondo: #fbe9e7;
+
+  /* Espaciado — múltiplos de 8px */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+
+  /* Tipografía */
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --texto-xs: 0.8rem;
+  --texto-sm: 0.875rem;
+  --texto-base: 0.95rem;
+  --texto-md: 1.05rem;
+  --texto-lg: 1.3rem;
+  --texto-xl: 1.6rem;
+
+  /* Forma y profundidad */
+  --radio: 12px;
+  --radio-chico: 8px;
+  --radio-pastilla: 999px;
+  --sombra: 0 1px 3px rgba(43, 43, 43, 0.06), 0 1px 2px rgba(43, 43, 43, 0.04);
+
+  /* Movimiento */
+  --transicion: 180ms ease;
 }
 
-* { box-sizing: border-box; }
+/* --- 2. Reset y base ------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
+html,
 body {
   margin: 0;
-  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  background: var(--fondo);
-  color: var(--texto);
+  padding: 0;
 }
 
-.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+body {
+  font-family: var(--fuente);
+  font-size: var(--texto-base);
+  line-height: 1.5;
+  background: var(--rosa-claro);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
 
-/* Encabezado del panel */
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--rosa);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- 3. Layout general ---------------------------------------------------- */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-3) var(--space-5);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+/* --- 4. Encabezado del panel ----------------------------------------------- */
 .header {
   background: var(--blanco);
   border-bottom: 1px solid var(--borde);
-  padding: 16px 20px;
 }
-.header h1 { margin: 0; font-size: 1.3rem; color: var(--rosado-oscuro); }
-.subtitle { margin: 2px 0 0; font-size: 0.85rem; color: var(--texto-suave); }
 
-/* Tarjetas */
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.header-marca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.header-logo {
+  height: 48px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Logo de reserva cuando uploads/logo.png todavía no existe: mismo tamaño
+   que la imagen real, para que el layout no salte cuando se suba el logo. */
+.header-logo-reserva {
+  height: 48px;
+  width: 48px;
+  border-radius: var(--radio-chico);
+  background: var(--rosa-claro);
+  color: var(--rosa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.header-logo-reserva .icon {
+  width: 24px;
+  height: 24px;
+}
+
+.header-texto h1 {
+  font-size: var(--texto-lg);
+  font-weight: 700;
+  color: var(--rosa);
+  line-height: 1.2;
+}
+
+.header-texto p {
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+  margin-top: 2px;
+}
+
+.header-usuario {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.header-usuario-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+}
+
+/* --- 5. Iconos -------------------------------------------------------------- */
+.icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  vertical-align: -4px;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+/* --- 6. Tarjeta --------------------------------------------------------- */
 .card {
   background: var(--blanco);
-  border: 1px solid var(--borde);
-  border-radius: 10px;
+  border-radius: var(--radio);
   box-shadow: var(--sombra);
-  padding: 20px;
-  margin-bottom: 20px;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
 }
-.card h2 { margin-top: 0; font-size: 1.05rem; color: var(--rosado-oscuro); }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.card-header h2 { margin: 0; }
-.alert-card { border-left: 4px solid var(--alerta); }
 
-/* Formularios */
-.form-group { display: flex; flex-direction: column; margin-bottom: 12px; }
-.form-group label { font-size: 0.82rem; font-weight: 600; color: var(--texto-suave); margin-bottom: 4px; }
-.form-group input {
-  padding: 9px 10px;
+.card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--texto-md);
+  font-weight: 700;
+  color: var(--rosa);
+  margin-bottom: var(--space-2);
+}
+
+.card h2.subtitle {
+  color: var(--texto);
+  font-size: var(--texto-base);
+  font-weight: 700;
+  margin-top: var(--space-3);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.card-header h2 {
+  margin-bottom: 0;
+}
+
+.card-intro {
+  color: var(--texto-suave);
+  font-size: var(--texto-sm);
+  margin-bottom: var(--space-2);
+}
+
+.alert-card {
+  border-left: 4px solid var(--alerta);
+}
+
+/* --- 7. Formularios ------------------------------------------------------- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-2);
+}
+
+.form-group label {
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  color: var(--texto-suave);
+  margin-bottom: 6px;
+}
+
+.form-group label.form-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group select {
+  padding: 10px 12px;
   border: 1px solid var(--borde);
-  border-radius: 6px;
-  font-size: 0.95rem;
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-base);
   font-family: inherit;
+  background: var(--blanco);
+  transition: border-color var(--transicion), box-shadow var(--transicion);
 }
-.form-group input:focus { outline: none; border-color: var(--rosado-oscuro); }
-.form-actions { display: flex; align-items: flex-end; }
 
-/* Botones */
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--rosa);
+  box-shadow: 0 0 0 3px rgba(194, 24, 91, 0.12);
+}
+
+.form-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-2);
+}
+
+.form-grid-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0 var(--space-2);
+  align-items: end;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .form-grid-2col,
+  .form-grid-3col {
+    grid-template-columns: 1fr;
+  }
+  .span-2 {
+    grid-column: span 1;
+  }
+}
+
+/* --- 8. Botones ----------------------------------------------------------- */
 .btn {
-  padding: 9px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background-color var(--transicion), color var(--transicion), box-shadow var(--transicion);
+  white-space: nowrap;
 }
-.btn-primary { background: var(--rosado-oscuro); color: #fff; }
-.btn-primary:hover { background: #a01650; }
-.btn-secondary { background: var(--rosado-claro); color: var(--rosado-oscuro); }
-.btn-secondary:hover { background: var(--rosado-medio); }
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-/* Mensajes de resultado (éxito / error) */
-.mensaje { margin-top: 10px; font-size: 0.88rem; min-height: 1.2em; }
-.mensaje.exito { color: var(--exito); }
-.mensaje.error { color: var(--error); }
+.btn-primary {
+  background: var(--rosa);
+  color: var(--blanco);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--rosa-oscuro);
+}
 
-/* Estados vacíos */
-.empty-state { color: var(--texto-suave); font-style: italic; padding: 8px 0; }
+.btn-secondary {
+  background: var(--rosa-claro);
+  color: var(--rosa);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--lila);
+  color: var(--texto);
+}
 
-/* Alertas de stock bajo (HU-04) */
-.alertas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.alerta-item {
+.btn-danger {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--error);
+  color: var(--blanco);
+}
+
+.btn-neutral {
+  background: transparent;
+  color: var(--texto-suave);
+  border: 1px solid var(--borde);
+}
+.btn-neutral:hover:not(:disabled) {
+  background: var(--rosa-claro);
+  color: var(--texto);
+  border-color: var(--rosa-claro);
+}
+
+.btn-full {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: var(--texto-xs);
+}
+
+/* --- 9. Mensajes (éxito / error / alerta) --------------------------------- */
+.mensaje {
+  margin-top: var(--space-1);
+  min-height: 1.4em;
+}
+
+.mensaje:empty {
+  margin-top: 0;
+  min-height: 0;
+}
+
+.mensaje-caja {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-sm);
+  animation: aparecer var(--transicion);
+}
+.mensaje-caja .icon {
+  margin-top: 1px;
+}
+
+.mensaje.exito .mensaje-caja {
+  background: var(--exito-fondo);
+  color: var(--exito);
+}
+.mensaje.error .mensaje-caja {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+.mensaje.alerta .mensaje-caja {
   background: var(--alerta-fondo);
-  border: 1px solid #ffe0b2;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 0.88rem;
-  color: #7a3e00;
+  color: #8a5a00;
 }
 
-/* Tabla de inventario (HU-05) */
-.tabla-inventario { width: 100%; border-collapse: collapse; }
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mensaje-caja {
+    animation: none;
+  }
+}
+
+/* Estados vacíos / textos auxiliares */
+.empty-state {
+  color: var(--texto-suave);
+  padding: var(--space-1) 0;
+  font-size: var(--texto-sm);
+}
+
+/* --- 10. Tablas ----------------------------------------------------------- */
+.tabla-inventario {
+  width: 100%;
+  border-collapse: collapse;
+}
 .tabla-inventario th,
 .tabla-inventario td {
-  padding: 9px 10px;
+  padding: 10px 12px;
   text-align: left;
   border-bottom: 1px solid var(--borde);
-  font-size: 0.88rem;
+  font-size: var(--texto-sm);
 }
 .tabla-inventario th {
-  background: var(--rosado-claro);
-  color: var(--rosado-oscuro);
-  font-weight: 600;
+  background: var(--rosa-claro);
+  color: var(--rosa);
+  font-weight: 700;
+  font-size: var(--texto-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
-.tabla-inventario tbody tr:hover { background: #fafafa; }
+.tabla-inventario tbody tr:hover {
+  background: #fafafa;
+}
+.tabla-inventario tr.fila-mora {
+  background: var(--error-fondo);
+}
+.tabla-inventario tr.fila-mora:hover {
+  background: #f6d9d5;
+}
 
-/* Badges de estado de stock */
+/* --- 11. Badges ------------------------------------------------------------ */
 .badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radio-pastilla);
+  font-size: var(--texto-xs);
+  font-weight: 700;
 }
-.badge-ok { background: var(--exito-fondo); color: var(--exito); }
-.badge-low { background: var(--error-fondo); color: var(--error); }
+.badge-ok {
+  background: var(--exito-fondo);
+  color: var(--exito);
+}
+.badge-low {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+.badge-neutro {
+  background: var(--lila);
+  color: var(--texto);
+}
 
-/* Deudas en mora (HU-13) */
-.tabla-inventario tr.fila-mora { background: var(--error-fondo); }
-.tabla-inventario tr.fila-mora:hover { background: #fbdedb; }
+/* --- 12. Alertas de stock bajo -------------------------------------------- */
+.alertas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-1);
+}
+.alerta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--alerta-fondo);
+  border-radius: var(--radio-chico);
+  padding: 10px 12px;
+  font-size: var(--texto-sm);
+  color: #7a3e00;
+}
+.alerta-item .icon {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
 
-/* Pestañas del panel */
+/* --- 13. Pestañas ----------------------------------------------------------- */
 .tabs {
   display: flex;
-  gap: 6px;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: var(--space-3);
   border-bottom: 1px solid var(--borde);
 }
 .tab-btn {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
   border: none;
   background: none;
-  font-size: 0.92rem;
+  font-size: var(--texto-sm);
   font-weight: 600;
   color: var(--texto-suave);
   cursor: pointer;
   border-bottom: 3px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--transicion), border-color var(--transicion);
 }
-.tab-btn:hover { color: var(--rosado-oscuro); }
-.tab-btn.active { color: var(--rosado-oscuro); border-bottom-color: var(--rosado-oscuro); }
+.tab-btn:hover {
+  color: var(--rosa);
+}
+.tab-btn.active {
+  color: var(--rosa);
+  border-bottom-color: var(--rosa);
+}
 
-/* Ventas y Facturación */
-.venta-totales { margin-top: 16px; }
+/* --- 14. Ventas y facturación ------------------------------------------------ */
+.venta-totales {
+  margin-top: var(--space-2);
+}
 
 .resumen-totales {
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-1);
   border-top: 1px solid var(--borde);
   text-align: right;
 }
-.resumen-totales p { margin: 4px 0; font-size: 0.9rem; color: var(--texto-suave); }
-.resumen-totales strong { color: var(--texto); }
-.resumen-totales .total-final { font-size: 1.1rem; }
-.resumen-totales .total-final strong { color: var(--rosado-oscuro); }
+.resumen-totales p {
+  margin: 6px 0;
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+}
+.resumen-totales strong {
+  color: var(--texto);
+}
+.resumen-totales .total-final {
+  font-size: var(--texto-lg);
+  margin-top: 10px;
+}
+.resumen-totales .total-final strong {
+  color: var(--rosa);
+}
 
 .factura-email {
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--borde);
 }
 
@@ -174,86 +605,85 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--rosado-oscuro);
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--rosa);
 }
-.factura-header h2 { margin: 0; color: var(--rosado-oscuro); }
-.factura-logo { display: block; max-height: 56px; max-width: 220px; margin-bottom: 6px; }
-.factura-meta { text-align: right; font-size: 0.88rem; color: var(--texto-suave); }
-.factura-meta p { margin: 2px 0; }
+.factura-header h2 {
+  margin-bottom: 0;
+  color: var(--rosa);
+}
+.factura-logo {
+  display: block;
+  max-height: 56px;
+  max-width: 220px;
+  margin-bottom: 6px;
+}
+.factura-meta {
+  text-align: right;
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+.factura-meta p {
+  margin: 2px 0;
+}
 
 @media print {
-  .no-print, .header, .tabs { display: none !important; }
-  .card.factura { box-shadow: none; border: none; }
-  body { background: #fff; }
+  .no-print,
+  .header,
+  .tabs {
+    display: none !important;
+  }
+  .card.factura {
+    box-shadow: none;
+    border: none;
+  }
+  body {
+    background: #fff;
+  }
 }
 
-/* Utilidades y Layout General */
-.hidden { display: none !important; }
-.span-2 { grid-column: span 2; }
-.table-responsive { overflow-x: auto; }
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.btn-full { width: 100%; margin-top: 10px; }
-.btn-logout { background-color: #e0e0e0; color: #333; }
-.btn-logout:hover { background-color: #d6d6d6; }
-
-/* Vista Login (HU-01) */
+/* --- 15. Vista de login ------------------------------------------------------ */
 .login-container {
-  min-height: 80vh;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: var(--space-3);
 }
 
 .login-card {
   width: 100%;
   max-width: 380px;
-  border-top: 5px solid var(--rosado-oscuro);
+  border-top: 4px solid var(--rosa);
 }
 
 .header-login {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-3);
+}
+.header-login h1 {
+  color: var(--rosa);
+  font-size: var(--texto-xl);
+  font-weight: 700;
+}
+.header-login p {
+  color: var(--texto-suave);
+  font-size: var(--texto-sm);
+  margin-top: 4px;
 }
 
-.header-login h1 { color: var(--rosado-oscuro); }
-
-/* Recuperación de contraseña */
 .link-sutil {
   display: block;
   text-align: center;
-  margin-top: 14px;
-  font-size: 0.85rem;
-  color: var(--rosado-oscuro);
+  margin-top: var(--space-2);
+  font-size: var(--texto-sm);
+  color: var(--rosa);
   text-decoration: none;
   cursor: pointer;
 }
-.link-sutil:hover { text-decoration: underline; }
-
-/* Grillas de Formularios (HU-02 y HU-03) */
-.form-grid-2col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.form-grid-3col {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 12px;
-  align-items: end;
-}
-
-@media (max-width: 600px) {
-  .form-grid-2col, .form-grid-3col {
-    grid-template-columns: 1fr;
-  }
-  .span-2 { grid-column: span 1; }
+.link-sutil:hover {
+  text-decoration: underline;
 }
