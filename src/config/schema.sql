@@ -261,8 +261,10 @@ INSERT OR IGNORE INTO configuracion_empresa (id, nombre_empresa) VALUES (1, 'Mil
 -- - detalle (TEXT): un RESUMEN legible en una línea, no el objeto completo
 --   antes/después. Para creaciones basta describir lo creado; para
 --   ediciones, auditoriaService.resumirCambios() arma algo como
---   "precio_detal: 12000 -> 13000" listando solo los campos que
---   efectivamente cambiaron. Guardar el JSON completo del registro en cada
+--   "Precio al detal: $12.000 -> $13.000" (nombre de columna traducido y
+--   valor formateado vía el catálogo CAMPOS_AUDITABLES del mismo archivo),
+--   listando solo los campos que efectivamente cambiaron. Guardar el JSON
+--   completo del registro en cada
 --   evento infla la tabla sin agregar valor real de auditoría: lo que
 --   importa para "qué pasó" es qué cambió, no repetir campos que ya estaban
 --   en la fila original y no se tocaron.

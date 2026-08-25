@@ -279,6 +279,15 @@ a {
   font-weight: 600;
 }
 
+/* Texto de ayuda debajo de un campo, cuando el nombre del campo no basta
+   para explicar en lenguaje de negocio qué hace (ej. el % de IVA). */
+.campo-ayuda {
+  font-size: var(--texto-xs);
+  font-weight: 400;
+  color: var(--texto-suave);
+  margin-top: 4px;
+}
+
 .form-group input[type="text"],
 .form-group input[type="email"],
 .form-group input[type="password"],
@@ -1080,6 +1089,23 @@ a {
   padding-bottom: 10px;
 }
 
+/* Buscador sobre una tabla de reportes (ventas de hoy, del rango, ranking):
+   mismo tratamiento visual que .productos-buscar/.clientes-buscar, en una
+   clase compartida porque acá no va emparejado con una casilla al lado. */
+.tabla-buscar input {
+  width: 100%;
+  max-width: 360px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-base);
+  font-family: inherit;
+}
+.tabla-buscar input:focus {
+  outline: none;
+  border-color: var(--rosa);
+}
+
 /* --- 18. Pantalla de reportes (totales jerarquizados) ---------------------- */
 .reporte-encabezado {
   color: var(--texto-suave);
@@ -1151,6 +1177,32 @@ a {
   text-align: center;
   margin-bottom: var(--space-3);
 }
+.login-logo {
+  height: 64px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto var(--space-1);
+}
+/* Logo de reserva cuando uploads/logo.png todavía no existe: mismo criterio
+   que .header-logo-reserva (encabezado del panel), centrado acá porque
+   .header-login ya alinea todo su contenido al centro. */
+.login-logo-reserva {
+  height: 64px;
+  width: 64px;
+  border-radius: var(--radio-chico);
+  background: var(--rosa-claro);
+  color: var(--rosa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-1);
+}
+.login-logo-reserva .icon {
+  width: 30px;
+  height: 30px;
+}
 .header-login h1 {
   color: var(--rosa);
   font-size: var(--texto-xl);
@@ -1173,4 +1225,37 @@ a {
 }
 .link-sutil:hover {
   text-decoration: underline;
+}
+
+/* --- 20. Pantalla de configuración (vista previa del logo) ----------------- */
+.config-logo-grupo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.config-logo-grupo .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+.config-logo-vista-previa {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  background: var(--rosa-claro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.config-logo-vista-previa img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.config-logo-vista-previa .icon {
+  width: 26px;
+  height: 26px;
+  color: var(--texto-suave);
 }

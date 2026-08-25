@@ -131,25 +131,29 @@ async function solicitarRecuperacion(identificador, ip = null) {
   return { exito: true, mensaje: MENSAJE_GENERICO };
 }
 
-function confirmarRecuperacion({ usuario: identificador, codigo, nuevaPassword } = {}, ip = null) {
-  const MENSAJE_CODIGO_INVALIDO = 'El código es inválido o ya expiró. Solicita uno nuevo.';
+const MENSAJE_CODIGO_INVALIDO = 'El código es inválido o ya expiró. Solicita uno nuevo.';
 
-  if (typeof nuevaPassword !== 'string' || nuevaPassword.length < MIN_LONGITUD_PASSWORD) {
-    return {
-      exito: false,
-      error: 'password_invalida',
-      mensaje: `La nueva contraseña debe tener al menos ${MIN_LONGITUD_PASSWORD} caracteres.`,
-    };
-  }
-
+// Núcleo compartido entre validarCodigo() (paso 2 del frontend: solo
+// confirma que el código escrito es el correcto, antes de mostrar los
+// campos de contraseña nueva) y confirmarRecuperacion() (paso 3: el cambio
+// real). Las dos comparten el MISMO estado en memoria (codigosPorUsuario) y
+// el MISMO contador de intentos: separar la validación en dos llamadas no
+// abre una segunda vía para adivinar el código sin límite — cada intento
+// fallido, venga de la ruta que venga, sigue sumando al mismo `intentos` y
+// dispara el mismo bloqueo a los MAX_INTENTOS_CODIGO de siempre.
+//
+// A propósito NO borra el estado en un acierto: eso lo decide quien la
+// llama (confirmarRecuperacion sí lo consume, porque ya va a cambiar la
+// contraseña; validarCodigo lo deja intacto, porque todavía falta el paso
+// 3 y el mismo código se vuelve a necesitar ahí).
+function verificarCodigo(identificador, codigo) {
   if (typeof codigo !== 'string' || !/^\d{6}$/.test(codigo.trim())) {
     return { exito: false, error: 'codigo_invalido', mensaje: MENSAJE_CODIGO_INVALIDO };
   }
 
-  // A partir de acá, cualquier motivo de rechazo (usuario inexistente,
-  // código vencido, código incorrecto) devuelve exactamente el mismo error:
-  // no hay forma de distinguir "ese usuario no existe" de "el código está
-  // mal" desde afuera.
+  // Cualquier motivo de rechazo (usuario inexistente, código vencido, código
+  // incorrecto) devuelve exactamente el mismo error: no hay forma de
+  // distinguir "ese usuario no existe" de "el código está mal" desde afuera.
   const registro = resolverUsuario(identificador);
   if (!registro) {
     return { exito: false, error: 'codigo_invalido', mensaje: MENSAJE_CODIGO_INVALIDO };
@@ -171,6 +175,33 @@ function confirmarRecuperacion({ usuario: identificador, codigo, nuevaPassword }
     }
     return { exito: false, error: 'codigo_invalido', mensaje: MENSAJE_CODIGO_INVALIDO };
   }
+
+  return { exito: true, registro };
+}
+
+// Paso 2 del frontend: confirma que el código es válido SIN consumirlo ni
+// cambiar nada todavía — así el formulario puede mostrar recién ahí los
+// campos de contraseña nueva, con la certeza de que el código ya es
+// correcto (y no descubrirlo al final, después de que la usuaria ya
+// escribió la contraseña dos veces).
+function validarCodigo(identificador, codigo) {
+  const resultado = verificarCodigo(identificador, codigo);
+  if (!resultado.exito) return { exito: false, error: resultado.error, mensaje: resultado.mensaje };
+  return { exito: true };
+}
+
+function confirmarRecuperacion({ usuario: identificador, codigo, nuevaPassword } = {}, ip = null) {
+  if (typeof nuevaPassword !== 'string' || nuevaPassword.length < MIN_LONGITUD_PASSWORD) {
+    return {
+      exito: false,
+      error: 'password_invalida',
+      mensaje: `La nueva contraseña debe tener al menos ${MIN_LONGITUD_PASSWORD} caracteres.`,
+    };
+  }
+
+  const resultado = verificarCodigo(identificador, codigo);
+  if (!resultado.exito) return { exito: false, error: resultado.error, mensaje: resultado.mensaje };
+  const { registro } = resultado;
 
   // Código correcto: se consume de inmediato (un solo uso) antes de tocar
   // la BD, para que un error a mitad de camino nunca deje un código válido
@@ -200,4 +231,4 @@ function confirmarRecuperacion({ usuario: identificador, codigo, nuevaPassword }
   return { exito: true, mensaje: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' };
 }
 
-module.exports = { solicitarRecuperacion, confirmarRecuperacion, MIN_LONGITUD_PASSWORD };
+module.exports = { solicitarRecuperacion, validarCodigo, confirmarRecuperacion, MIN_LONGITUD_PASSWORD };

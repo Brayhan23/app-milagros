@@ -166,17 +166,21 @@
   <div id="vista-login" class="login-container">
     <div id="tarjeta-login" class="card login-card">
       <div class="header-login">
+        <img id="login-logo" class="login-logo" src="uploads/logo.png" alt="Logo de Milagros">
+        <div id="login-logo-reserva" class="login-logo-reserva hidden" aria-hidden="true">
+          <svg class="icon"><use href="#icon-image-off"></use></svg>
+        </div>
         <h1>Milagros</h1>
-        <p>Iniciar sesión</p>
+        <p>Distribuidora Oficial San Roque, Antioquia</p>
       </div>
       <form id="form-login">
         <div class="form-group">
           <label for="login-usuario">Usuario</label>
-          <input type="text" id="login-usuario" placeholder="Ingresa tu usuario" required>
+          <input type="text" id="login-usuario" placeholder="Ingresa tu usuario" required autocomplete="username">
         </div>
         <div class="form-group">
           <label for="login-password">Contraseña</label>
-          <input type="password" id="login-password" placeholder="••••••••" required>
+          <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
         </div>
         <button type="submit" class="btn btn-primary btn-full">Ingresar</button>
       </form>
@@ -184,15 +188,16 @@
       <a href="#" id="link-olvide-password" class="link-sutil">¿Olvidaste tu contraseña?</a>
     </div>
 
-    <!-- Recuperación de contraseña, paso 1: pedir código -->
-    <!-- No es un enlace por correo con una página web propia: la app corre
-         en localhost del PC de la tienda y no es accesible desde el celular
-         ni desde internet. El código se pide y se ingresa en esta misma
-         pantalla, en el mismo computador. -->
+    <!-- Recuperación de contraseña en 3 pasos: 1) pedir el código por
+         correo, 2) validar SOLO el código, 3) recién ahí definir la
+         contraseña nueva. No es un enlace por correo con una página web
+         propia: la app corre en localhost del PC de la tienda y no es
+         accesible desde el celular ni desde internet. El código se pide y
+         se ingresa en esta misma pantalla, en el mismo computador. -->
     <div id="vista-recuperar-solicitar" class="card login-card hidden">
       <div class="header-login">
         <h1>Recuperar contraseña</h1>
-        <p>Escribe tu usuario o correo registrado</p>
+        <p>Paso 1 de 3 — Escribe tu usuario o correo registrado</p>
       </div>
       <form id="form-recuperar-solicitar">
         <div class="form-group">
@@ -205,29 +210,43 @@
       <a href="#" id="link-volver-login-1" class="link-sutil">Volver a iniciar sesión</a>
     </div>
 
-    <!-- Recuperación de contraseña, paso 2: ingresar código + nueva contraseña -->
-    <div id="vista-recuperar-confirmar" class="card login-card hidden">
+    <!-- Paso 2: SOLO el código. Se valida contra el servidor antes de
+         avanzar — recién con eso confirmado se pide la contraseña nueva. -->
+    <div id="vista-recuperar-codigo" class="card login-card hidden">
       <div class="header-login">
-        <h1>Nueva contraseña</h1>
-        <p>Ingresa el código de 6 dígitos que enviamos a tu correo</p>
+        <h1>Verificar código</h1>
+        <p>Paso 2 de 3 — Ingresa el código de 6 dígitos que enviamos a tu correo</p>
       </div>
-      <form id="form-recuperar-confirmar">
+      <form id="form-recuperar-codigo">
         <div class="form-group">
           <label for="recuperar-codigo">Código de verificación</label>
           <input type="text" id="recuperar-codigo" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" required>
         </div>
+        <button type="submit" class="btn btn-primary btn-full">Verificar código</button>
+      </form>
+      <div id="mensaje-recuperar-codigo" class="mensaje"></div>
+      <a href="#" id="link-volver-login-2" class="link-sutil">Volver a iniciar sesión</a>
+    </div>
+
+    <!-- Paso 3: solo se llega acá con un código ya verificado en el paso 2. -->
+    <div id="vista-recuperar-password" class="card login-card hidden">
+      <div class="header-login">
+        <h1>Nueva contraseña</h1>
+        <p>Paso 3 de 3 — Código verificado, ahora escribe tu contraseña nueva</p>
+      </div>
+      <form id="form-recuperar-password">
         <div class="form-group">
           <label for="recuperar-nueva-password">Nueva contraseña</label>
-          <input type="password" id="recuperar-nueva-password" placeholder="Mínimo 8 caracteres" required>
+          <input type="password" id="recuperar-nueva-password" placeholder="Mínimo 8 caracteres" required autocomplete="new-password">
         </div>
         <div class="form-group">
           <label for="recuperar-confirmar-password">Confirmar contraseña</label>
-          <input type="password" id="recuperar-confirmar-password" placeholder="Repite la contraseña" required>
+          <input type="password" id="recuperar-confirmar-password" placeholder="Repite la contraseña" required autocomplete="new-password">
         </div>
         <button type="submit" class="btn btn-primary btn-full">Restablecer contraseña</button>
       </form>
-      <div id="mensaje-recuperar-confirmar" class="mensaje"></div>
-      <a href="#" id="link-volver-login-2" class="link-sutil">Volver a iniciar sesión</a>
+      <div id="mensaje-recuperar-password" class="mensaje"></div>
+      <a href="#" id="link-volver-login-3" class="link-sutil">Volver a iniciar sesión</a>
     </div>
   </div>
 
@@ -342,9 +361,9 @@
                   <th>N.°</th>
                   <th>Código</th>
                   <th>Producto</th>
-                  <th>P. Compra</th>
-                  <th>P. Detal</th>
-                  <th>P. Mayor</th>
+                  <th>Precio Compra</th>
+                  <th>Precio Detal</th>
+                  <th>Precio Mayor</th>
                   <th>Stock Actual</th>
                   <th>Stock Mín.</th>
                   <th>Estado</th>
@@ -616,11 +635,20 @@
             </div>
             <div class="form-group span-2">
               <label for="config-logo">Ruta o URL del logo</label>
-              <input type="text" id="config-logo" placeholder="Ej: uploads/logo.png">
+              <div class="config-logo-grupo">
+                <div class="form-group">
+                  <input type="text" id="config-logo" placeholder="Ej: uploads/logo.png">
+                </div>
+                <div id="config-logo-vista-previa" class="config-logo-vista-previa" title="Vista previa del logo">
+                  <svg class="icon"><use href="#icon-image-off"></use></svg>
+                </div>
+              </div>
+              <p class="campo-ayuda">Así se ve el logo con la ruta de arriba. Si no aparece nada, revisa que la ruta esté bien escrita.</p>
             </div>
             <div class="form-group">
               <label for="config-iva">IVA general (%)</label>
               <input type="number" id="config-iva" min="0" max="100" step="1" placeholder="Ej: 19">
+              <p class="campo-ayuda">Porcentaje de IVA que ya está incluido en los precios de tus productos. No se suma aparte al cobrar: solo se usa para mostrar cuánto de cada venta es impuesto.</p>
             </div>
             <div class="form-actions span-2">
               <button type="submit" class="btn btn-primary">Guardar configuración</button>
@@ -643,6 +671,12 @@
           <div class="card-header">
             <h2 class="subtitle">Ventas individuales de hoy</h2>
             <button type="button" id="btn-listado-ventas-hoy" class="btn btn-secondary">Ver ventas del día</button>
+          </div>
+          <div class="form-group tabla-buscar">
+            <label for="listado-ventas-hoy-buscar">
+              <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por cliente o número de factura
+            </label>
+            <input type="text" id="listado-ventas-hoy-buscar" placeholder="Ej: Juan, 152…" autocomplete="off">
           </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
@@ -685,6 +719,12 @@
             <h2 class="subtitle">Ventas individuales del rango</h2>
             <button type="button" id="btn-listado-historico" class="btn btn-secondary">Ver ventas del rango</button>
           </div>
+          <div class="form-group tabla-buscar">
+            <label for="listado-historico-buscar">
+              <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por cliente o número de factura
+            </label>
+            <input type="text" id="listado-historico-buscar" placeholder="Ej: Juan, 152…" autocomplete="off">
+          </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
               <thead>
@@ -713,6 +753,12 @@
             </div>
           </div>
           <div id="mensaje-ranking" class="mensaje"></div>
+          <div class="form-group tabla-buscar">
+            <label for="ranking-buscar">
+              <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por nombre de producto
+            </label>
+            <input type="text" id="ranking-buscar" placeholder="Ej: shampoo…" autocomplete="off">
+          </div>
           <div class="table-responsive">
             <table class="tabla-inventario">
               <thead>

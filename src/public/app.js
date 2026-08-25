@@ -9,18 +9,10 @@ const formLogin = document.getElementById('form-login');
 const mensajeLogin = document.getElementById('mensaje-login');
 const btnLogout = document.getElementById('btn-logout');
 
-// Encabezado: logo (con reserva si uploads/logo.png todavía no existe) y
-// nombre del usuario actual.
-const headerLogo = document.getElementById('header-logo');
-const headerLogoReserva = document.getElementById('header-logo-reserva');
-const headerUsuarioNombre = document.getElementById('header-usuario-nombre');
-const headerUsuarioTexto = document.getElementById('header-usuario-texto');
-
-function activarFallbackLogo() {
-  headerLogo.classList.add('hidden');
-  headerLogoReserva.classList.remove('hidden');
-}
-
+// Logo con reserva si uploads/logo.png todavía no existe: mismo mecanismo
+// para el encabezado del panel y para la tarjeta de login, así que queda en
+// una sola función en vez de repetirlo por cada lugar que muestra el logo.
+//
 // El <script> vive al final del body, así que el navegador ya empezó (y en
 // un 404 local, puede ya haber TERMINADO) a cargar la imagen antes de que
 // este código llegue a engancharse al evento 'error' — enganchar el
@@ -28,11 +20,27 @@ function activarFallbackLogo() {
 // que existiera el listener. Por eso se revisa primero si ya falló
 // (complete === true y naturalWidth === 0 es la señal de una carga
 // terminada en error) y, si no, recién ahí se espera el evento futuro.
-if (headerLogo.complete && headerLogo.naturalWidth === 0) {
-  activarFallbackLogo();
-} else {
-  headerLogo.addEventListener('error', activarFallbackLogo);
+function activarFallbackLogoSiHaceFalta(img, reserva) {
+  const activar = () => {
+    img.classList.add('hidden');
+    reserva.classList.remove('hidden');
+  };
+  if (img.complete && img.naturalWidth === 0) {
+    activar();
+  } else {
+    img.addEventListener('error', activar);
+  }
 }
+
+// Encabezado del panel: logo y nombre del usuario actual.
+const headerLogo = document.getElementById('header-logo');
+const headerLogoReserva = document.getElementById('header-logo-reserva');
+const headerUsuarioNombre = document.getElementById('header-usuario-nombre');
+const headerUsuarioTexto = document.getElementById('header-usuario-texto');
+activarFallbackLogoSiHaceFalta(headerLogo, headerLogoReserva);
+
+// Tarjeta de login: mismo logo, mismo mecanismo de reserva.
+activarFallbackLogoSiHaceFalta(document.getElementById('login-logo'), document.getElementById('login-logo-reserva'));
 
 // Nombre de quien inició sesión, solo en memoria (no es un dato de negocio
 // para guardar en localStorage, y el token no lo trae codificado): se
@@ -288,39 +296,57 @@ formLogin.addEventListener('submit', async (e) => {
   }
 });
 
-// --- Recuperación de contraseña ---
+// --- Recuperación de contraseña (3 pasos: solicitar código, verificar
+// código, definir contraseña nueva) ---
 
 const vistaRecuperarSolicitar = document.getElementById('vista-recuperar-solicitar');
-const vistaRecuperarConfirmar = document.getElementById('vista-recuperar-confirmar');
+const vistaRecuperarCodigo = document.getElementById('vista-recuperar-codigo');
+const vistaRecuperarPassword = document.getElementById('vista-recuperar-password');
 const formRecuperarSolicitar = document.getElementById('form-recuperar-solicitar');
-const formRecuperarConfirmar = document.getElementById('form-recuperar-confirmar');
+const formRecuperarCodigo = document.getElementById('form-recuperar-codigo');
+const formRecuperarPassword = document.getElementById('form-recuperar-password');
 const mensajeRecuperarSolicitar = document.getElementById('mensaje-recuperar-solicitar');
-const mensajeRecuperarConfirmar = document.getElementById('mensaje-recuperar-confirmar');
+const mensajeRecuperarCodigo = document.getElementById('mensaje-recuperar-codigo');
+const mensajeRecuperarPassword = document.getElementById('mensaje-recuperar-password');
 
 // Identificador (usuario o correo) que se usó para pedir el código: se
-// reutiliza al confirmar, así el paso 2 no le vuelve a pedir ese dato a la
-// usuaria.
+// reutiliza en los pasos 2 y 3, así no se le vuelve a pedir ese dato a la
+// usuaria. El código ya verificado en el paso 2 también se guarda acá para
+// mandarlo de nuevo en el paso 3 (el backend lo revisa otra vez antes de
+// cambiar la contraseña) sin que la usuaria tenga que volver a escribirlo.
 let identificadorRecuperacion = '';
+let codigoRecuperacionVerificado = '';
 
 const tarjetaLogin = document.getElementById('tarjeta-login');
 
+function ocultarVistasRecuperar() {
+  vistaRecuperarSolicitar.classList.add('hidden');
+  vistaRecuperarCodigo.classList.add('hidden');
+  vistaRecuperarPassword.classList.add('hidden');
+}
+
 function mostrarVistaLogin() {
   tarjetaLogin.classList.remove('hidden');
-  vistaRecuperarSolicitar.classList.add('hidden');
-  vistaRecuperarConfirmar.classList.add('hidden');
+  ocultarVistasRecuperar();
 }
 
 function mostrarVistaRecuperarSolicitar() {
   tarjetaLogin.classList.add('hidden');
+  ocultarVistasRecuperar();
   vistaRecuperarSolicitar.classList.remove('hidden');
-  vistaRecuperarConfirmar.classList.add('hidden');
   mostrarMensaje(mensajeRecuperarSolicitar, '', null);
 }
 
-function mostrarVistaRecuperarConfirmar() {
-  vistaRecuperarSolicitar.classList.add('hidden');
-  vistaRecuperarConfirmar.classList.remove('hidden');
-  mostrarMensaje(mensajeRecuperarConfirmar, '', null);
+function mostrarVistaRecuperarCodigo() {
+  ocultarVistasRecuperar();
+  vistaRecuperarCodigo.classList.remove('hidden');
+  mostrarMensaje(mensajeRecuperarCodigo, '', null);
+}
+
+function mostrarVistaRecuperarPassword() {
+  ocultarVistasRecuperar();
+  vistaRecuperarPassword.classList.remove('hidden');
+  mostrarMensaje(mensajeRecuperarPassword, '', null);
 }
 
 document.getElementById('link-olvide-password').addEventListener('click', (e) => {
@@ -338,6 +364,12 @@ document.getElementById('link-volver-login-2').addEventListener('click', (e) => 
   mostrarVistaLogin();
 });
 
+document.getElementById('link-volver-login-3').addEventListener('click', (e) => {
+  e.preventDefault();
+  mostrarVistaLogin();
+});
+
+// Paso 1: pedir el código por correo.
 formRecuperarSolicitar.addEventListener('submit', async (e) => {
   e.preventDefault();
   mostrarMensaje(mensajeRecuperarSolicitar, '', null);
@@ -358,24 +390,55 @@ formRecuperarSolicitar.addEventListener('submit', async (e) => {
     }
 
     identificadorRecuperacion = usuario;
-    formRecuperarConfirmar.reset();
-    mostrarVistaRecuperarConfirmar();
-    mostrarMensaje(mensajeRecuperarConfirmar, data.mensaje, 'exito');
+    formRecuperarCodigo.reset();
+    mostrarVistaRecuperarCodigo();
+    mostrarMensaje(mensajeRecuperarCodigo, data.mensaje, 'exito');
   } catch (err) {
     mostrarMensaje(mensajeRecuperarSolicitar, 'Error de conexión con el servidor.', 'error');
   }
 });
 
-formRecuperarConfirmar.addEventListener('submit', async (e) => {
+// Paso 2: verificar el código contra el servidor ANTES de mostrar los
+// campos de contraseña nueva. No lo consume (el backend lo deja intacto
+// para el paso 3), pero sí cuenta como intento sobre el mismo límite de 5
+// que ya existía — ver recuperacionService.verificarCodigo.
+formRecuperarCodigo.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mostrarMensaje(mensajeRecuperarConfirmar, '', null);
+  mostrarMensaje(mensajeRecuperarCodigo, '', null);
 
   const codigo = document.getElementById('recuperar-codigo').value.trim();
+
+  try {
+    const res = await fetch(`${API_URL}/auth/recuperar-validar-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: identificadorRecuperacion, codigo }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeRecuperarCodigo, data.mensaje || 'No se pudo verificar el código.', 'error');
+      return;
+    }
+
+    codigoRecuperacionVerificado = codigo;
+    formRecuperarPassword.reset();
+    mostrarVistaRecuperarPassword();
+  } catch (err) {
+    mostrarMensaje(mensajeRecuperarCodigo, 'Error de conexión con el servidor.', 'error');
+  }
+});
+
+// Paso 3: recién acá se pide (y se cambia) la contraseña nueva.
+formRecuperarPassword.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mostrarMensaje(mensajeRecuperarPassword, '', null);
+
   const nuevaPassword = document.getElementById('recuperar-nueva-password').value;
   const confirmarPassword = document.getElementById('recuperar-confirmar-password').value;
 
   if (nuevaPassword !== confirmarPassword) {
-    mostrarMensaje(mensajeRecuperarConfirmar, 'Las contraseñas no coinciden.', 'error');
+    mostrarMensaje(mensajeRecuperarPassword, 'Las contraseñas no coinciden.', 'error');
     return;
   }
 
@@ -383,22 +446,28 @@ formRecuperarConfirmar.addEventListener('submit', async (e) => {
     const res = await fetch(`${API_URL}/auth/recuperar-confirmar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario: identificadorRecuperacion, codigo, nuevaPassword }),
+      body: JSON.stringify({ usuario: identificadorRecuperacion, codigo: codigoRecuperacionVerificado, nuevaPassword }),
     });
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mostrarMensaje(mensajeRecuperarConfirmar, data.mensaje || 'No se pudo restablecer la contraseña.', 'error');
+      // Si el código venció justo entre el paso 2 y este (10 minutos de
+      // margen, poco probable pero posible), el mensaje genérico del
+      // backend ya lo explica; la usuaria puede volver a pedir uno nuevo
+      // con el enlace de abajo.
+      mostrarMensaje(mensajeRecuperarPassword, data.mensaje || 'No se pudo restablecer la contraseña.', 'error');
       return;
     }
 
     formRecuperarSolicitar.reset();
-    formRecuperarConfirmar.reset();
+    formRecuperarCodigo.reset();
+    formRecuperarPassword.reset();
     identificadorRecuperacion = '';
+    codigoRecuperacionVerificado = '';
     mostrarVistaLogin();
     mostrarMensaje(mensajeLogin, data.mensaje, 'exito');
   } catch (err) {
-    mostrarMensaje(mensajeRecuperarConfirmar, 'Error de conexión con el servidor.', 'error');
+    mostrarMensaje(mensajeRecuperarPassword, 'Error de conexión con el servidor.', 'error');
   }
 });
 
@@ -1589,19 +1658,25 @@ function renderizarFichaCliente() {
 // el desglose de IVA — y mostrarFactura(), la misma función que ya pinta la
 // factura recién generada: no se duplica el renderizado en ningún lado nuevo.
 async function verFacturaCompleta(ventaId) {
+  // Va a la pestaña de Facturas primero (igual en éxito que en error): así
+  // un error tiene dónde mostrarse con el mismo estilo que el resto de la
+  // app (mensajeVenta), en vez de una alerta nativa del navegador que
+  // interrumpe y no combina con el diseño del resto de las pantallas.
+  document.querySelector('.tab-btn[data-tab="facturas"]').click();
+  mostrarMensaje(mensajeVenta, '', null);
+
   try {
     const res = await fetch(`${API_URL}/ventas/${ventaId}`, { headers: obtenerHeaders() });
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      window.alert(data.mensaje || 'No se pudo cargar la factura.');
+      mostrarMensaje(mensajeVenta, data.mensaje || 'No se pudo cargar la factura.', 'error');
       return;
     }
 
-    document.querySelector('.tab-btn[data-tab="facturas"]').click();
     mostrarFactura(data.venta);
   } catch (err) {
-    window.alert('Error de conexión al cargar la factura.');
+    mostrarMensaje(mensajeVenta, 'Error de conexión al cargar la factura.', 'error');
   }
 }
 
@@ -1908,8 +1983,30 @@ async function eliminarClienteActual() {
 
 const formConfiguracion = document.getElementById('form-configuracion');
 const mensajeConfiguracion = document.getElementById('mensaje-configuracion');
+const inputConfigLogo = document.getElementById('config-logo');
+const configLogoVistaPrevia = document.getElementById('config-logo-vista-previa');
 
 let configuracionActual = null;
+
+const ICONO_LOGO_VACIO = `<svg class="icon"><use href="#icon-image-off"></use></svg>`;
+
+// Vista previa del logo configurado: se actualiza al cargar la pantalla y
+// en cada cambio del campo, así la usuaria ve de inmediato si la ruta que
+// escribió sirve (encuentra la imagen) o no (queda el ícono de reserva) —
+// sin tener que guardar primero para enterarse.
+function actualizarVistaPreviaLogo() {
+  const ruta = inputConfigLogo.value.trim();
+  if (!ruta) {
+    configLogoVistaPrevia.innerHTML = ICONO_LOGO_VACIO;
+    return;
+  }
+
+  configLogoVistaPrevia.innerHTML = `<img src="${escaparHtml(ruta)}" alt="Vista previa del logo">`;
+  configLogoVistaPrevia.querySelector('img').addEventListener('error', () => {
+    configLogoVistaPrevia.innerHTML = ICONO_LOGO_VACIO;
+  });
+}
+inputConfigLogo.addEventListener('input', actualizarVistaPreviaLogo);
 
 async function cargarConfiguracion() {
   try {
@@ -1923,8 +2020,9 @@ async function cargarConfiguracion() {
       document.getElementById('config-direccion').value = configuracionActual.direccion || '';
       document.getElementById('config-telefono').value = configuracionActual.telefono || '';
       document.getElementById('config-correo').value = configuracionActual.correo || '';
-      document.getElementById('config-logo').value = configuracionActual.logo_ruta || '';
+      inputConfigLogo.value = configuracionActual.logo_ruta || '';
       document.getElementById('config-iva').value = configuracionActual.iva_porcentaje ?? '';
+      actualizarVistaPreviaLogo();
     }
   } catch (err) {
     configuracionActual = null;
@@ -1964,7 +2062,7 @@ formConfiguracion.addEventListener('submit', async (e) => {
     direccion: document.getElementById('config-direccion').value.trim() || null,
     telefono: document.getElementById('config-telefono').value.trim() || null,
     correo: document.getElementById('config-correo').value.trim() || null,
-    logoRuta: document.getElementById('config-logo').value.trim() || null,
+    logoRuta: inputConfigLogo.value.trim() || null,
     ivaPorcentaje: Number(document.getElementById('config-iva').value),
   };
 
@@ -2158,10 +2256,12 @@ document.getElementById('btn-exportar-pdf').addEventListener('click', () => expo
 // Listado de ventas individuales que componen un reporte (día/rango): misma
 // tabla para ambos casos, con un botón "Ver factura" por fila que reutiliza
 // verFacturaCompleta() (la misma función que ya usa el detalle de deuda de
-// un cliente).
-function renderizarListadoVentas(tbody, ventas) {
+// un cliente). mensajeVacio distingue "no hay nada cargado todavía / el
+// rango no tiene ventas" de "hay ventas, pero ninguna coincide con la
+// búsqueda" — mismo criterio que ya usa renderizarTablaProductos().
+function renderizarListadoVentas(tbody, ventas, mensajeVacio = 'Sin ventas en este rango.') {
   if (!ventas || ventas.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Sin ventas en este rango.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${mensajeVacio}</td></tr>`;
     return;
   }
 
@@ -2181,8 +2281,36 @@ function renderizarListadoVentas(tbody, ventas) {
     .join('');
 }
 
+// Cada listado guarda su propia copia en memoria (son dos consultas
+// distintas — "hoy" y "el rango elegido" — nunca el mismo dato) para poder
+// filtrar por cliente/número de factura sin volver a pedirle nada al
+// servidor en cada tecla, mismo patrón que productosCache/clientesCache.
+let ventasHoyCache = [];
+let ventasHistoricoCache = [];
+
+function coincideBusquedaVenta(venta, termino) {
+  return String(venta.id).includes(termino) || (venta.nombre_cliente && venta.nombre_cliente.toLowerCase().includes(termino));
+}
+
+function filtrarListadoVentasHoy() {
+  const termino = document.getElementById('listado-ventas-hoy-buscar').value.trim().toLowerCase();
+  const filtradas = termino ? ventasHoyCache.filter((v) => coincideBusquedaVenta(v, termino)) : ventasHoyCache;
+  const mensajeVacio = ventasHoyCache.length === 0 ? 'Sin ventas en este rango.' : 'No se encontraron ventas con ese criterio.';
+  renderizarListadoVentas(document.getElementById('tabla-body-listado-ventas-hoy'), filtradas, mensajeVacio);
+}
+document.getElementById('listado-ventas-hoy-buscar').addEventListener('input', filtrarListadoVentasHoy);
+
+function filtrarListadoHistorico() {
+  const termino = document.getElementById('listado-historico-buscar').value.trim().toLowerCase();
+  const filtradas = termino ? ventasHistoricoCache.filter((v) => coincideBusquedaVenta(v, termino)) : ventasHistoricoCache;
+  const mensajeVacio = ventasHistoricoCache.length === 0 ? 'Sin ventas en este rango.' : 'No se encontraron ventas con ese criterio.';
+  renderizarListadoVentas(document.getElementById('tabla-body-listado-historico'), filtradas, mensajeVacio);
+}
+document.getElementById('listado-historico-buscar').addEventListener('input', filtrarListadoHistorico);
+
 document.getElementById('btn-listado-ventas-hoy').addEventListener('click', async () => {
   const tbody = document.getElementById('tabla-body-listado-ventas-hoy');
+  document.getElementById('listado-ventas-hoy-buscar').value = '';
   tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
 
   try {
@@ -2190,12 +2318,15 @@ document.getElementById('btn-listado-ventas-hoy').addEventListener('click', asyn
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
+      ventasHoyCache = [];
       tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar el listado.'}</td></tr>`;
       return;
     }
 
-    renderizarListadoVentas(tbody, data.ventas);
+    ventasHoyCache = data.ventas;
+    renderizarListadoVentas(tbody, ventasHoyCache);
   } catch (err) {
+    ventasHoyCache = [];
     tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error de conexión al cargar el listado.</td></tr>';
   }
 });
@@ -2204,8 +2335,10 @@ document.getElementById('btn-listado-historico').addEventListener('click', async
   const tbody = document.getElementById('tabla-body-listado-historico');
   const desde = document.getElementById('historico-desde').value;
   const hasta = document.getElementById('historico-hasta').value;
+  document.getElementById('listado-historico-buscar').value = '';
 
   if (!desde || !hasta) {
+    ventasHistoricoCache = [];
     tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Elegí ambas fechas (desde y hasta) arriba y consultá de nuevo.</td></tr>';
     return;
   }
@@ -2219,18 +2352,21 @@ document.getElementById('btn-listado-historico').addEventListener('click', async
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
+      ventasHistoricoCache = [];
       tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar el listado.'}</td></tr>`;
       return;
     }
 
-    renderizarListadoVentas(tbody, data.ventas);
+    ventasHistoricoCache = data.ventas;
+    renderizarListadoVentas(tbody, ventasHistoricoCache);
   } catch (err) {
+    ventasHistoricoCache = [];
     tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error de conexión al cargar el listado.</td></tr>';
   }
 });
 
 // Misma idea de delegación de eventos que en la ficha del cliente: estas
-// tablas de listado se regeneran con innerHTML en cada consulta.
+// tablas de listado se regeneran con innerHTML en cada consulta o filtro.
 document.getElementById('tabla-body-listado-ventas-hoy').addEventListener('click', (e) => {
   const boton = e.target.closest('.btn-ver-factura');
   if (!boton) return;
@@ -2244,10 +2380,40 @@ document.getElementById('tabla-body-listado-historico').addEventListener('click'
 });
 
 // Ranking de productos más vendidos, con rango de fechas opcional.
+let rankingCache = [];
+
+function renderizarRanking(tbody, productos, mensajeVacio) {
+  if (!productos || productos.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${mensajeVacio}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = productos
+    .map(
+      (p, indice) => `
+      <tr>
+        <td><strong>${indice + 1}</strong></td>
+        <td>${escaparHtml(p.nombre)}</td>
+        <td>${p.unidades_vendidas}</td>
+        <td>${formatearPesos(p.ingreso_generado)}</td>
+      </tr>
+    `
+    )
+    .join('');
+}
+
+function filtrarRanking() {
+  const termino = document.getElementById('ranking-buscar').value.trim().toLowerCase();
+  const filtrados = termino ? rankingCache.filter((p) => p.nombre.toLowerCase().includes(termino)) : rankingCache;
+  const mensajeVacio = rankingCache.length === 0 ? 'No hay ventas registradas en este rango.' : 'No se encontraron productos con ese nombre.';
+  renderizarRanking(document.getElementById('tabla-body-ranking'), filtrados, mensajeVacio);
+}
+document.getElementById('ranking-buscar').addEventListener('input', filtrarRanking);
+
 document.getElementById('btn-ranking').addEventListener('click', async () => {
   const mensajeRanking = document.getElementById('mensaje-ranking');
-  const tablaRanking = document.getElementById('tabla-body-ranking');
   mostrarMensaje(mensajeRanking, '', null);
+  document.getElementById('ranking-buscar').value = '';
 
   const desde = document.getElementById('ranking-desde').value;
   const hasta = document.getElementById('ranking-hasta').value;
@@ -2260,28 +2426,15 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
+      rankingCache = [];
       mostrarMensaje(mensajeRanking, data.mensaje || 'No se pudo consultar el ranking.', 'error');
       return;
     }
 
-    if (data.productos.length === 0) {
-      tablaRanking.innerHTML = '<tr><td colspan="4" class="empty-state">No hay ventas registradas en este rango.</td></tr>';
-      return;
-    }
-
-    tablaRanking.innerHTML = data.productos
-      .map(
-        (p, indice) => `
-        <tr>
-          <td><strong>${indice + 1}</strong></td>
-          <td>${escaparHtml(p.nombre)}</td>
-          <td>${p.unidades_vendidas}</td>
-          <td>${formatearPesos(p.ingreso_generado)}</td>
-        </tr>
-      `
-      )
-      .join('');
+    rankingCache = data.productos;
+    renderizarRanking(document.getElementById('tabla-body-ranking'), rankingCache, 'No hay ventas registradas en este rango.');
   } catch (err) {
+    rankingCache = [];
     mostrarMensaje(mensajeRanking, 'Error de conexión al consultar el ranking.', 'error');
   }
 });

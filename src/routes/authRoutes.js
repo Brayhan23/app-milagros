@@ -70,6 +70,28 @@ router.post('/recuperar-solicitar', async (req, res) => {
   return res.json({ exito: true, mensaje: resultado.mensaje });
 });
 
+// Paso 2 del flujo en 3 pasos del frontend: valida el código SIN consumirlo,
+// para poder mostrar los campos de contraseña nueva solo después de
+// confirmar que el código escrito es correcto. Comparte el mismo límite de
+// intentos que /recuperar-confirmar (ver el comentario en
+// recuperacionService.verificarCodigo) — no es una segunda vía para
+// adivinar códigos sin límite.
+router.post('/recuperar-validar-codigo', (req, res) => {
+  const { usuario, codigo } = req.body || {};
+
+  if (typeof usuario !== 'string' || !usuario.trim() || typeof codigo !== 'string') {
+    return res.status(400).json({ exito: false, mensaje: 'Debes indicar usuario y código.' });
+  }
+
+  const resultado = recuperacionService.validarCodigo(usuario.trim(), codigo.trim());
+
+  if (!resultado.exito) {
+    return res.status(400).json({ exito: false, mensaje: resultado.mensaje });
+  }
+
+  return res.json({ exito: true });
+});
+
 router.post('/recuperar-confirmar', (req, res) => {
   const { usuario, codigo, nuevaPassword } = req.body || {};
 

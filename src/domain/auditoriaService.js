@@ -77,19 +77,73 @@ function registrar({ usuario, accion, entidad = null, entidadId = null, detalle 
   }
 }
 
+// Catálogo único de campos auditables: de qué tabla vienen no importa acá
+// (productos, clientes y configuracion_empresa comparten algunos nombres,
+// ej. "nombre"), lo que importa es que CUALQUIER servicio que llame a
+// resumirCambios() traduzca igual la misma columna — así la usuaria nunca
+// ve "precio_detal" ni "12000" sueltos en el registro de auditoría, sin
+// importar si el cambio fue sobre un producto, un cliente o la
+// configuración del negocio. Si un servicio nuevo audita un campo que
+// todavía no está acá, se muestra el nombre de columna tal cual (mejor eso
+// que romper) — agregarlo a este mapa es la única corrección necesaria.
+//
+// tipo (default 'texto' si se omite):
+//   'moneda'    — pesos colombianos: 12000 -> "$12.000".
+//   'porcentaje'— con el símbolo %: 19 -> "19%".
+//   'booleano'  — 0/1 guardado en la BD -> "No"/"Sí".
+const CAMPOS_AUDITABLES = {
+  nombre: { etiqueta: 'Nombre' },
+  descripcion: { etiqueta: 'Descripción' },
+  codigo_barras: { etiqueta: 'Código de barras' },
+  precio_compra: { etiqueta: 'Precio de compra', tipo: 'moneda' },
+  precio_detal: { etiqueta: 'Precio al detal', tipo: 'moneda' },
+  precio_mayor: { etiqueta: 'Precio al por mayor', tipo: 'moneda' },
+  stock_minimo: { etiqueta: 'Stock mínimo' },
+  documento: { etiqueta: 'Documento' },
+  telefono: { etiqueta: 'Teléfono' },
+  correo: { etiqueta: 'Correo' },
+  es_mayorista: { etiqueta: 'Cliente mayorista', tipo: 'booleano' },
+  nombre_empresa: { etiqueta: 'Nombre de la empresa' },
+  nit: { etiqueta: 'NIT' },
+  direccion: { etiqueta: 'Dirección' },
+  logo_ruta: { etiqueta: 'Ruta del logo' },
+  iva_porcentaje: { etiqueta: 'Porcentaje de IVA', tipo: 'porcentaje' },
+};
+
+function etiquetaCampo(campo) {
+  const definicion = CAMPOS_AUDITABLES[campo];
+  return definicion ? definicion.etiqueta : campo;
+}
+
+function formatearValorCampo(campo, valor) {
+  if (valor === null || valor === undefined) return 'vacío';
+
+  const tipo = CAMPOS_AUDITABLES[campo] && CAMPOS_AUDITABLES[campo].tipo;
+  switch (tipo) {
+    case 'moneda':
+      return `$${Number(valor).toLocaleString('es-CO')}`;
+    case 'porcentaje':
+      return `${valor}%`;
+    case 'booleano':
+      return Number(valor) === 1 ? 'Sí' : 'No';
+    default:
+      return String(valor);
+  }
+}
+
 // Compara los campos indicados entre el estado "antes" y "después" de una
-// edición y arma un resumen legible de solo lo que cambió (ej.
-// "precio_detal: 12000 -> 13000"). No guarda el objeto completo: para poder
-// auditar después alcanza con saber qué campo cambió y entre qué valores.
+// edición y arma un resumen legible de solo lo que cambió (ej. "Precio al
+// detal: $12.000 -> $13.000"), traduciendo cada nombre de columna y
+// formateando su valor según CAMPOS_AUDITABLES. No guarda el objeto
+// completo: para poder auditar después alcanza con saber qué campo cambió y
+// entre qué valores.
 function resumirCambios(antes, despues, campos) {
   const cambios = [];
   for (const campo of campos) {
     const valorAntes = antes ? antes[campo] : undefined;
     const valorDespues = despues ? despues[campo] : undefined;
     if (valorAntes !== valorDespues) {
-      const textoAntes = valorAntes === null || valorAntes === undefined ? 'vacío' : valorAntes;
-      const textoDespues = valorDespues === null || valorDespues === undefined ? 'vacío' : valorDespues;
-      cambios.push(`${campo}: ${textoAntes} -> ${textoDespues}`);
+      cambios.push(`${etiquetaCampo(campo)}: ${formatearValorCampo(campo, valorAntes)} -> ${formatearValorCampo(campo, valorDespues)}`);
     }
   }
   return cambios.length > 0 ? cambios.join('; ') : 'sin cambios en los campos registrados';
