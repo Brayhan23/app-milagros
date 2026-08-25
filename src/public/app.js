@@ -197,7 +197,7 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
     }
 
     if (boton.dataset.tab === 'clientes') {
-      cargarDeudores();
+      cargarClientesPantalla();
     }
 
     if (boton.dataset.tab === 'auditoria') {
@@ -1025,150 +1025,270 @@ btnEnviarCorreo.addEventListener('click', async () => {
 });
 
 // --- CLIENTES Y CRÉDITOS ---
+//
+// Una sola pantalla: búsqueda + lista a la izquierda, ficha completa del
+// cliente seleccionado a la derecha (datos, deuda, facturas a crédito y
+// abonos, todo junto). clientesCache se carga una sola vez (combinando
+// GET /clientes con GET /clientes/deudas) y la búsqueda filtra en memoria,
+// igual que la búsqueda de productos de la pantalla de venta — sin pedir
+// nada al servidor por cada tecla. fichaClienteActual guarda la respuesta
+// de GET /clientes/:id/deuda del cliente abierto: registrar un abono la
+// actualiza en memoria y vuelve a pintar la ficha, sin recargar nada.
+
+const DIAS_LIMITE_MORA = 30; // mismo criterio que creditoService.js (HU-13)
 
 const formCliente = document.getElementById('form-cliente');
 const mensajeCliente = document.getElementById('mensaje-cliente');
-const tablaBodyDeudores = document.getElementById('tabla-body-deudores');
-const btnCargarDeudores = document.getElementById('btn-cargar-deudores');
-const inputDeudaClienteId = document.getElementById('deuda-cliente-id');
-const btnVerDeuda = document.getElementById('btn-ver-deuda');
-const detalleDeuda = document.getElementById('detalle-deuda');
-const formAbono = document.getElementById('form-abono');
-const mensajeAbono = document.getElementById('mensaje-abono');
+const inputClienteIdEditando = document.getElementById('cliente-id-editando');
+const btnMostrarFormCliente = document.getElementById('btn-mostrar-form-cliente');
+const btnCancelarFormCliente = document.getElementById('btn-cancelar-form-cliente');
+const btnGuardarCliente = document.getElementById('btn-guardar-cliente');
+const clientesBuscarInput = document.getElementById('clientes-buscar-input');
+const clientesListaEl = document.getElementById('clientes-lista');
+const clienteFichaEl = document.getElementById('cliente-ficha');
 
-// Registrar cliente
-formCliente.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  mostrarMensaje(mensajeCliente, '', null);
+let clientesCache = [];
+let clienteSeleccionadoId = null;
+let fichaClienteActual = null; // { cliente, ventas, abonos, saldoTotal }
+let abonoVentaIdAbierto = null; // venta_id cuyo panel de "registrar abono" está abierto
 
-  const payload = {
-    nombre: document.getElementById('cliente-nombre').value.trim(),
-    documento: document.getElementById('cliente-documento').value.trim() || null,
-    telefono: document.getElementById('cliente-telefono').value.trim() || null,
-    correo: document.getElementById('cliente-correo').value.trim() || null,
-    esMayorista: document.getElementById('cliente-mayorista').checked,
-  };
+// Mismo criterio de parseo que formatearFecha(): el backend guarda
+// "AAAA-MM-DD HH:MM:SS" en UTC sin marca de zona horaria, así que se
+// extraen los componentes a mano y se arman como UTC explícito — nunca
+// reinterpretar la zona horaria.
+function diasTranscurridos(fechaStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(fechaStr || '');
+  if (!m) return null;
+  const [anio, mes, dia, hora, min, seg] = m.slice(1).map(Number);
+  const fechaUTC = Date.UTC(anio, mes - 1, dia, hora, min, seg);
+  return Math.floor((Date.now() - fechaUTC) / 86400000);
+}
 
+function combinarClientesYDeudas(clientes, deudores) {
+  const deudaPorId = new Map(deudores.map((d) => [d.id, d]));
+  return clientes.map((c) => {
+    const deuda = deudaPorId.get(c.id);
+    return {
+      ...c,
+      saldo_total: deuda ? deuda.saldo_total : 0,
+      dias_deuda_mas_vieja: deuda ? deuda.dias_deuda_mas_vieja : null,
+      en_mora: deuda ? deuda.en_mora : false,
+    };
+  });
+}
+
+// Carga inicial (o recarga tras crear/editar/desactivar un cliente): trae
+// la lista completa y la deuda de todos de una sola vez.
+async function cargarClientesPantalla() {
+  clientesListaEl.innerHTML = '<p class="empty-state">Cargando clientes…</p>';
   try {
-    const res = await fetch(`${API_URL}/clientes`, {
-      method: 'POST',
-      headers: obtenerHeaders(),
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
+    const [resClientes, resDeudas] = await Promise.all([
+      fetch(`${API_URL}/clientes`, { headers: obtenerHeaders() }),
+      fetch(`${API_URL}/clientes/deudas`, { headers: obtenerHeaders() }),
+    ]);
+    const dataClientes = await resClientes.json();
+    const dataDeudas = await resDeudas.json();
 
-    if (!res.ok || !data.exito) {
-      mostrarMensaje(mensajeCliente, data.mensaje || 'Error al registrar el cliente.', 'error');
+    if (!resClientes.ok || !dataClientes.exito) {
+      clientesListaEl.innerHTML = '<p class="empty-state">No se pudo cargar la lista de clientes.</p>';
       return;
     }
 
-    mostrarMensaje(mensajeCliente, `Cliente "${data.cliente.nombre}" registrado (N.° ${data.cliente.id}).`, 'exito');
-    formCliente.reset();
-    cargarClientesParaVenta();
-  } catch (err) {
-    mostrarMensaje(mensajeCliente, 'Error de conexión al guardar el cliente.', 'error');
-  }
-});
+    clientesCache = combinarClientesYDeudas(dataClientes.clientes, dataDeudas.exito ? dataDeudas.clientes : []);
+    filtrarClientes();
 
-// Clientes con deuda pendiente
-btnCargarDeudores.addEventListener('click', cargarDeudores);
-
-async function cargarDeudores() {
-  try {
-    const res = await fetch(`${API_URL}/clientes/deudas`, { headers: obtenerHeaders() });
-    const data = await res.json();
-
-    if (!data.exito || !data.clientes || data.clientes.length === 0) {
-      tablaBodyDeudores.innerHTML = `<tr><td colspan="5" class="empty-state">No hay clientes con deuda pendiente.</td></tr>`;
-      return;
+    if (clienteSeleccionadoId && clientesCache.some((c) => c.id === clienteSeleccionadoId)) {
+      seleccionarCliente(clienteSeleccionadoId);
+    } else {
+      clienteSeleccionadoId = null;
+      fichaClienteActual = null;
+      clienteFichaEl.innerHTML = '<p class="empty-state">Seleccioná un cliente de la lista para ver su información completa.</p>';
     }
-
-    // Fila resaltada + insignia cuando la deuda más vieja del cliente supera
-    // los 30 días (en_mora ya viene calculado del backend).
-    tablaBodyDeudores.innerHTML = data.clientes
-      .map(
-        (c) => `
-        <tr class="${c.en_mora ? 'fila-mora' : ''}">
-          <td>${c.id}</td>
-          <td>${escaparHtml(c.nombre)}</td>
-          <td>${escaparHtml(c.documento) || '—'}</td>
-          <td>${formatearPesos(c.saldo_total)}</td>
-          <td>
-            ${c.dias_deuda_mas_vieja} día(s)
-            ${c.en_mora ? `<span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} En mora</span>` : ''}
-          </td>
-        </tr>
-      `
-      )
-      .join('');
   } catch (err) {
-    tablaBodyDeudores.innerHTML = `<tr><td colspan="5" class="empty-state">Error al cargar los deudores.</td></tr>`;
+    clientesListaEl.innerHTML = '<p class="empty-state">Error de conexión al cargar los clientes.</p>';
   }
 }
 
-// Detalle de deuda de un cliente (ventas a crédito + abonos)
-btnVerDeuda.addEventListener('click', async () => {
-  const clienteId = inputDeudaClienteId.value;
-  if (!clienteId) {
-    detalleDeuda.innerHTML = '<p class="empty-state">Escribí el número de un cliente.</p>';
+// Filtra clientesCache en memoria — nunca dispara una petición por tecla.
+function filtrarClientes() {
+  const termino = clientesBuscarInput.value.trim().toLowerCase();
+  const filtrados = termino
+    ? clientesCache.filter(
+        (c) =>
+          c.nombre.toLowerCase().includes(termino) ||
+          (c.documento && c.documento.toLowerCase().includes(termino))
+      )
+    : clientesCache;
+  renderizarListaClientes(filtrados);
+}
+clientesBuscarInput.addEventListener('input', filtrarClientes);
+
+function renderizarListaClientes(lista) {
+  if (lista.length === 0) {
+    clientesListaEl.innerHTML = '<p class="empty-state">No se encontraron clientes.</p>';
     return;
   }
 
+  clientesListaEl.innerHTML = lista
+    .map((c) => {
+      const saldoTexto =
+        c.saldo_total > 0
+          ? `<strong>${formatearPesos(c.saldo_total)}</strong>`
+          : `<span class="badge badge-ok">${icono('circle-check', 'icon-sm')} Al día</span>`;
+
+      return `
+        <button type="button" class="cliente-fila${c.en_mora ? ' fila-mora' : ''}${c.id === clienteSeleccionadoId ? ' seleccionado' : ''}" data-id="${c.id}">
+          <span class="cliente-fila-nombre">
+            <strong>${escaparHtml(c.nombre)}</strong>
+            <span>${c.documento ? escaparHtml(c.documento) : 'Sin documento'}${c.es_mayorista ? ' · Mayorista' : ''}</span>
+          </span>
+          <span class="cliente-fila-saldo">
+            ${saldoTexto}
+            ${c.en_mora ? `<span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} Mora</span>` : ''}
+          </span>
+        </button>
+      `;
+    })
+    .join('');
+}
+
+clientesListaEl.addEventListener('click', (e) => {
+  const fila = e.target.closest('.cliente-fila');
+  if (!fila) return;
+  seleccionarCliente(Number(fila.dataset.id));
+});
+
+async function seleccionarCliente(id) {
+  clienteSeleccionadoId = id;
+  abonoVentaIdAbierto = null;
+  document.querySelectorAll('.cliente-fila').forEach((el) => {
+    el.classList.toggle('seleccionado', Number(el.dataset.id) === id);
+  });
+
+  clienteFichaEl.innerHTML = '<p class="empty-state">Cargando…</p>';
   try {
-    const res = await fetch(`${API_URL}/clientes/${clienteId}/deuda`, { headers: obtenerHeaders() });
+    const res = await fetch(`${API_URL}/clientes/${id}/deuda`, { headers: obtenerHeaders() });
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      detalleDeuda.innerHTML = `<p class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo consultar la deuda.'}</p>`;
+      clienteFichaEl.innerHTML = `<p class="empty-state">${escaparHtml(data.mensaje) || 'No se pudo cargar la información del cliente.'}</p>`;
       return;
     }
 
-    const filasVentas = data.ventas.length
-      ? data.ventas
-          .map(
-            (v) => `
-          <tr>
-            <td>${v.venta_id}</td>
-            <td>${formatearFecha(v.creado_en)}</td>
-            <td>${formatearPesos(v.total)}</td>
-            <td>${formatearPesos(v.abonado)}</td>
-            <td>${formatearPesos(v.saldo)}</td>
-            <td><button type="button" class="btn btn-secondary btn-sm btn-ver-factura" data-venta-id="${v.venta_id}">Ver factura</button></td>
-          </tr>
-        `
-          )
-          .join('')
-      : '<tr><td colspan="6" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
+    fichaClienteActual = data;
+    renderizarFichaCliente();
+  } catch (err) {
+    clienteFichaEl.innerHTML = '<p class="empty-state">Error de conexión al cargar la información del cliente.</p>';
+  }
+}
 
-    const filasAbonos = data.abonos.length
-      ? data.abonos.map((a) => `<li>Factura N.° ${a.venta_id}: ${formatearPesos(a.monto)} (${formatearFecha(a.creado_en)})</li>`).join('')
-      : '<li class="empty-state">Sin abonos registrados.</li>';
+function filaAbonoInline(venta) {
+  return `
+    <tr>
+      <td colspan="6">
+        <div class="abono-inline">
+          <p>Registrar pago sobre la factura N.° ${venta.venta_id} — saldo pendiente: <strong>${formatearPesos(venta.saldo)}</strong></p>
+          <form id="form-abono" class="form-grid-3col" data-venta-id="${venta.venta_id}" data-saldo="${venta.saldo}">
+            <div class="form-group">
+              <label for="abono-monto">Monto del pago ($)</label>
+              <input type="number" id="abono-monto" min="1" max="${venta.saldo}" placeholder="Ej: 20000" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Registrar pago</button>
+              <button type="button" id="btn-cancelar-abono" class="btn btn-neutral btn-sm">Cancelar</button>
+            </div>
+          </form>
+          <p class="abono-saldo-referencia" id="abono-restante-preview"></p>
+          <div id="mensaje-abono" class="mensaje"></div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
 
-    const saldoTexto =
-      data.saldoTotal === 0
-        ? `<span class="badge badge-ok">${icono('circle-check', 'icon-sm')} Al día — deuda saldada</span>`
-        : `<strong>${formatearPesos(data.saldoTotal)}</strong>`;
+function renderizarFichaCliente() {
+  if (!fichaClienteActual) return;
+  const { cliente, ventas, abonos, saldoTotal } = fichaClienteActual;
 
-    detalleDeuda.innerHTML = `
-      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: ${saldoTexto}</p>
+  const datos = [
+    cliente.documento ? `Documento: ${escaparHtml(cliente.documento)}` : null,
+    cliente.telefono ? `Teléfono: ${escaparHtml(cliente.telefono)}` : null,
+    cliente.correo ? `Correo: ${escaparHtml(cliente.correo)}` : null,
+  ].filter(Boolean);
+
+  const saldoTexto =
+    saldoTotal === 0
+      ? `<span class="badge badge-ok">${icono('circle-check', 'icon-sm')} Al día — deuda saldada</span>`
+      : `<strong>${formatearPesos(saldoTotal)}</strong>`;
+
+  const filasVentas = ventas.length
+    ? ventas
+        .map((v) => {
+          const dias = v.saldo > 0 ? diasTranscurridos(v.creado_en) : null;
+          const enMora = dias !== null && dias > DIAS_LIMITE_MORA;
+          const filaVenta = `
+            <tr class="${enMora ? 'fila-mora' : ''}">
+              <td>${v.venta_id}</td>
+              <td>${formatearFecha(v.creado_en)}</td>
+              <td>${formatearPesos(v.total)}</td>
+              <td>${formatearPesos(v.abonado)}</td>
+              <td>
+                ${formatearPesos(v.saldo)}
+                ${enMora ? `<br><span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} ${dias} día(s)</span>` : ''}
+              </td>
+              <td class="acciones-factura">
+                <button type="button" class="btn btn-secondary btn-sm btn-ver-factura" data-venta-id="${v.venta_id}">Ver factura</button>
+                ${v.saldo > 0 ? `<button type="button" class="btn btn-primary btn-sm btn-registrar-abono-fila" data-venta-id="${v.venta_id}">Registrar abono</button>` : ''}
+              </td>
+            </tr>
+          `;
+          return abonoVentaIdAbierto === v.venta_id ? filaVenta + filaAbonoInline(v) : filaVenta;
+        })
+        .join('')
+    : '<tr><td colspan="6" class="empty-state">Este cliente no tiene ventas a crédito.</td></tr>';
+
+  const filasAbonos = abonos.length
+    ? abonos.map((a) => `<li>Factura N.° ${a.venta_id}: ${formatearPesos(a.monto)} (${formatearFecha(a.creado_en)})</li>`).join('')
+    : '<li class="empty-state">Sin abonos registrados.</li>';
+
+  clienteFichaEl.innerHTML = `
+    <div class="cliente-ficha-header">
+      <h3>
+        ${escaparHtml(cliente.nombre)}
+        ${cliente.es_mayorista ? '<span class="badge badge-neutro">Mayorista</span>' : ''}
+      </h3>
+      <div class="cliente-ficha-acciones">
+        <button type="button" id="btn-editar-cliente" class="btn btn-secondary btn-sm">${icono('pencil', 'icon-sm')} Editar</button>
+        <button type="button" id="btn-desactivar-cliente" class="btn btn-danger btn-sm">${icono('user-x', 'icon-sm')} Desactivar</button>
+      </div>
+    </div>
+    <p class="cliente-ficha-datos">${datos.length ? datos.join(' · ') : 'Sin datos de contacto registrados.'}</p>
+    <p class="cliente-ficha-saldo">Deuda total: ${saldoTexto}</p>
+    <div id="mensaje-ficha-cliente" class="mensaje"></div>
+
+    <h4>Facturas a crédito</h4>
+    <div class="table-responsive">
       <table class="tabla-inventario">
         <thead>
-          <tr><th>Factura</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Ver</th></tr>
+          <tr><th>Factura</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th></th></tr>
         </thead>
         <tbody>${filasVentas}</tbody>
       </table>
-      <p><strong>Abonos:</strong></p>
-      <ul>${filasAbonos}</ul>
-    `;
-  } catch (err) {
-    detalleDeuda.innerHTML = '<p class="empty-state">Error de conexión al consultar la deuda.</p>';
+    </div>
+
+    <h4>Abonos registrados</h4>
+    <ul>${filasAbonos}</ul>
+  `;
+
+  if (abonoVentaIdAbierto) {
+    const inputMonto = document.getElementById('abono-monto');
+    if (inputMonto) inputMonto.focus();
   }
-});
+}
 
 // Ver la factura completa (items, cantidades, precios) de una venta desde
-// cualquier listado que solo muestre totales (detalle de deuda, listado de
-// reportes). Reutiliza GET /api/ventas/:id — ya trae los items y el
-// desglose de IVA — y mostrarFactura(), la misma función que ya pinta la
+// la ficha del cliente. Reutiliza GET /api/ventas/:id — ya trae los items y
+// el desglose de IVA — y mostrarFactura(), la misma función que ya pinta la
 // factura recién generada: no se duplica el renderizado en ningún lado nuevo.
 async function verFacturaCompleta(ventaId) {
   try {
@@ -1187,22 +1307,111 @@ async function verFacturaCompleta(ventaId) {
   }
 }
 
-// Delegación de eventos: las filas de detalle-deuda se regeneran por
-// completo con innerHTML en cada consulta, así que un listener por botón se
-// perdería; uno solo en el contenedor cubre todos los botones presentes y futuros.
-detalleDeuda.addEventListener('click', (e) => {
-  const boton = e.target.closest('.btn-ver-factura');
-  if (!boton) return;
-  verFacturaCompleta(boton.dataset.ventaId);
+// Aplica el resultado de un abono exitoso sobre los datos ya cargados en
+// memoria (ficha + lista), sin volver a pedirle nada al servidor.
+function aplicarAbonoEnFicha(ventaId, abono, saldoRestante) {
+  const venta = fichaClienteActual.ventas.find((v) => v.venta_id === ventaId);
+  if (venta) {
+    venta.abonado += abono.monto;
+    venta.saldo = saldoRestante;
+  }
+  fichaClienteActual.abonos.unshift(abono);
+  fichaClienteActual.saldoTotal = fichaClienteActual.ventas.reduce((suma, v) => suma + v.saldo, 0);
+
+  const clienteEnCache = clientesCache.find((c) => c.id === fichaClienteActual.cliente.id);
+  if (clienteEnCache) {
+    clienteEnCache.saldo_total = fichaClienteActual.saldoTotal;
+    const pendientes = fichaClienteActual.ventas.filter((v) => v.saldo > 0);
+    if (pendientes.length === 0) {
+      clienteEnCache.dias_deuda_mas_vieja = null;
+      clienteEnCache.en_mora = false;
+    } else {
+      // Comparación lexicográfica de "AAAA-MM-DD HH:MM:SS" equivale a
+      // orden cronológico — no hace falta parsear fechas para hallar la más vieja.
+      const masVieja = pendientes.reduce((min, v) => (v.creado_en < min.creado_en ? v : min));
+      const dias = diasTranscurridos(masVieja.creado_en);
+      clienteEnCache.dias_deuda_mas_vieja = dias;
+      clienteEnCache.en_mora = dias > DIAS_LIMITE_MORA;
+    }
+  }
+}
+
+// Delegación de eventos sobre toda la ficha: su HTML se regenera por
+// completo en cada renderizarFichaCliente(), así que un solo listener acá
+// cubre los botones de ver factura, registrar abono, editar y desactivar,
+// presentes o futuros.
+clienteFichaEl.addEventListener('click', (e) => {
+  const btnVerFactura = e.target.closest('.btn-ver-factura');
+  if (btnVerFactura) {
+    verFacturaCompleta(btnVerFactura.dataset.ventaId);
+    return;
+  }
+
+  const btnAbrirAbono = e.target.closest('.btn-registrar-abono-fila');
+  if (btnAbrirAbono) {
+    abonoVentaIdAbierto = Number(btnAbrirAbono.dataset.ventaId);
+    renderizarFichaCliente();
+    return;
+  }
+
+  if (e.target.closest('#btn-cancelar-abono')) {
+    abonoVentaIdAbierto = null;
+    renderizarFichaCliente();
+    return;
+  }
+
+  if (e.target.closest('#btn-editar-cliente')) {
+    abrirFormCliente(fichaClienteActual.cliente);
+    return;
+  }
+
+  if (e.target.closest('#btn-desactivar-cliente')) {
+    desactivarClienteActual();
+  }
 });
 
-// Registrar abono
-formAbono.addEventListener('submit', async (e) => {
+// Vista previa en vivo del saldo restante mientras se escribe el monto.
+clienteFichaEl.addEventListener('input', (e) => {
+  if (e.target.id !== 'abono-monto') return;
+  const form = e.target.closest('form');
+  const saldo = Number(form.dataset.saldo);
+  const monto = Number(e.target.value) || 0;
+  const preview = document.getElementById('abono-restante-preview');
+  if (!preview) return;
+
+  if (monto <= 0) {
+    preview.textContent = '';
+    preview.classList.remove('excede');
+  } else if (monto > saldo) {
+    preview.textContent = `El monto no puede superar el saldo pendiente (${formatearPesos(saldo)}).`;
+    preview.classList.add('excede');
+  } else {
+    preview.textContent = `Quedaría un saldo de ${formatearPesos(saldo - monto)}.`;
+    preview.classList.remove('excede');
+  }
+});
+
+// Registrar abono (avisa antes de enviar si el monto supera el saldo — el
+// backend también lo valida, pero avisar antes evita el viaje al servidor).
+clienteFichaEl.addEventListener('submit', async (e) => {
+  if (e.target.id !== 'form-abono') return;
   e.preventDefault();
+
+  const form = e.target;
+  const ventaId = Number(form.dataset.ventaId);
+  const saldo = Number(form.dataset.saldo);
+  const monto = Number(document.getElementById('abono-monto').value);
+  const mensajeAbono = document.getElementById('mensaje-abono');
   mostrarMensaje(mensajeAbono, '', null);
 
-  const ventaId = document.getElementById('abono-venta-id').value;
-  const monto = Number(document.getElementById('abono-monto').value);
+  if (!Number.isInteger(monto) || monto <= 0) {
+    mostrarMensaje(mensajeAbono, 'Ingresá un monto válido.', 'error');
+    return;
+  }
+  if (monto > saldo) {
+    mostrarMensaje(mensajeAbono, `El monto no puede superar el saldo pendiente (${formatearPesos(saldo)}).`, 'error');
+    return;
+  }
 
   try {
     const res = await fetch(`${API_URL}/ventas/${ventaId}/abonos`, {
@@ -1217,17 +1426,122 @@ formAbono.addEventListener('submit', async (e) => {
       return;
     }
 
+    aplicarAbonoEnFicha(ventaId, data.abono, data.saldoRestante);
+    abonoVentaIdAbierto = null;
+    renderizarFichaCliente();
+    filtrarClientes();
     mostrarMensaje(
-      mensajeAbono,
-      `Pago registrado. Saldo restante de la factura N.° ${ventaId}: ${formatearPesos(data.saldoRestante)}.`,
+      document.getElementById('mensaje-ficha-cliente'),
+      `Pago de ${formatearPesos(monto)} registrado en la factura N.° ${ventaId}. Nuevo saldo: ${formatearPesos(data.saldoRestante)}.`,
       'exito'
     );
-    formAbono.reset();
-    cargarDeudores();
   } catch (err) {
     mostrarMensaje(mensajeAbono, 'Error de conexión al registrar el abono.', 'error');
   }
 });
+
+// --- Registrar / editar cliente (mismo formulario para ambos casos) ---
+
+function abrirFormCliente(cliente = null) {
+  formCliente.reset();
+  if (cliente) {
+    inputClienteIdEditando.value = cliente.id;
+    document.getElementById('cliente-nombre').value = cliente.nombre || '';
+    document.getElementById('cliente-documento').value = cliente.documento || '';
+    document.getElementById('cliente-telefono').value = cliente.telefono || '';
+    document.getElementById('cliente-correo').value = cliente.correo || '';
+    document.getElementById('cliente-mayorista').checked = Boolean(cliente.es_mayorista);
+    btnGuardarCliente.textContent = 'Guardar cambios';
+  } else {
+    inputClienteIdEditando.value = '';
+    btnGuardarCliente.textContent = 'Guardar cliente';
+  }
+  mostrarMensaje(mensajeCliente, '', null);
+  formCliente.classList.remove('hidden');
+  formCliente.scrollIntoView({ block: 'nearest' });
+  document.getElementById('cliente-nombre').focus();
+}
+
+function cerrarFormCliente() {
+  formCliente.classList.add('hidden');
+  formCliente.reset();
+  inputClienteIdEditando.value = '';
+  mostrarMensaje(mensajeCliente, '', null);
+}
+
+btnMostrarFormCliente.addEventListener('click', () => abrirFormCliente(null));
+btnCancelarFormCliente.addEventListener('click', cerrarFormCliente);
+
+formCliente.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mostrarMensaje(mensajeCliente, '', null);
+
+  const idEditando = inputClienteIdEditando.value;
+  const payload = {
+    nombre: document.getElementById('cliente-nombre').value.trim(),
+    documento: document.getElementById('cliente-documento').value.trim() || null,
+    telefono: document.getElementById('cliente-telefono').value.trim() || null,
+    correo: document.getElementById('cliente-correo').value.trim() || null,
+    esMayorista: document.getElementById('cliente-mayorista').checked,
+  };
+
+  try {
+    const res = await fetch(`${API_URL}/clientes${idEditando ? `/${idEditando}` : ''}`, {
+      method: idEditando ? 'PUT' : 'POST',
+      headers: obtenerHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeCliente, data.mensaje || 'No se pudo guardar el cliente.', 'error');
+      return;
+    }
+
+    mostrarMensaje(
+      mensajeCliente,
+      idEditando ? `Cliente "${data.cliente.nombre}" actualizado.` : `Cliente "${data.cliente.nombre}" registrado (N.° ${data.cliente.id}).`,
+      'exito'
+    );
+    cerrarFormCliente();
+    if (!idEditando) clienteSeleccionadoId = data.cliente.id;
+    cargarClientesPantalla();
+    cargarClientesParaVenta();
+  } catch (err) {
+    mostrarMensaje(mensajeCliente, 'Error de conexión al guardar el cliente.', 'error');
+  }
+});
+
+async function desactivarClienteActual() {
+  const cliente = fichaClienteActual && fichaClienteActual.cliente;
+  if (!cliente) return;
+
+  const confirmado = window.confirm(
+    `¿Desactivar a "${cliente.nombre}"? No vas a poder elegirlo para ventas nuevas, pero su historial de facturas y abonos se conserva.`
+  );
+  if (!confirmado) return;
+
+  try {
+    const res = await fetch(`${API_URL}/clientes/${cliente.id}`, {
+      method: 'DELETE',
+      headers: obtenerHeaders(),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeCliente, data.mensaje || 'No se pudo desactivar el cliente.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeCliente, `Cliente "${cliente.nombre}" desactivado.`, 'exito');
+    clienteSeleccionadoId = null;
+    fichaClienteActual = null;
+    cargarClientesPantalla();
+    cargarClientesParaVenta();
+  } catch (err) {
+    mostrarMensaje(mensajeCliente, 'Error de conexión al desactivar el cliente.', 'error');
+  }
+}
 
 // --- DATOS DE LA EMPRESA ---
 
@@ -1523,8 +1837,8 @@ document.getElementById('btn-listado-historico').addEventListener('click', async
   }
 });
 
-// Misma delegación de eventos que detalleDeuda: ambas tablas de listado se
-// regeneran con innerHTML en cada consulta.
+// Misma idea de delegación de eventos que en la ficha del cliente: estas
+// tablas de listado se regeneran con innerHTML en cada consulta.
 document.getElementById('tabla-body-listado-ventas-hoy').addEventListener('click', (e) => {
   const boton = e.target.closest('.btn-ver-factura');
   if (!boton) return;

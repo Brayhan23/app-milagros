@@ -826,7 +826,178 @@ a {
   margin-top: var(--space-1);
 }
 
-/* --- 16. Vista de login ------------------------------------------------------ */
+/* --- 16. Pantalla de clientes (búsqueda + ficha) --------------------------- */
+.clientes-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 860px) {
+  .clientes-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.clientes-buscar input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-base);
+  font-family: inherit;
+}
+.clientes-buscar input:focus {
+  outline: none;
+  border-color: var(--rosa);
+}
+
+.clientes-lista {
+  max-height: 640px;
+  overflow-y: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+}
+.clientes-lista .empty-state {
+  padding: var(--space-2);
+}
+
+.cliente-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--borde);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+.cliente-fila:last-child {
+  border-bottom: none;
+}
+.cliente-fila:hover {
+  background: rgba(218, 201, 223, 0.25);
+}
+.cliente-fila.seleccionado {
+  background: var(--rosa-claro);
+  border-left-color: var(--rosa);
+}
+.cliente-fila.fila-mora {
+  background: var(--error-fondo);
+}
+.cliente-fila.fila-mora.seleccionado {
+  background: var(--error-fondo);
+  border-left-color: var(--rosa);
+}
+.cliente-fila-nombre {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cliente-fila-nombre strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cliente-fila-nombre span {
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+}
+.cliente-fila-saldo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  font-size: var(--texto-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cliente-ficha {
+  min-height: 200px;
+}
+.cliente-ficha-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--lila);
+}
+.cliente-ficha-header h3 {
+  font-size: var(--texto-md);
+  font-weight: 700;
+  color: var(--rosa);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cliente-ficha-acciones {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cliente-ficha-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+  margin-bottom: var(--space-2);
+}
+.cliente-ficha-saldo {
+  margin-bottom: var(--space-3);
+  font-size: var(--texto-base);
+}
+.cliente-ficha-saldo strong {
+  font-size: var(--texto-lg);
+}
+.cliente-ficha h4 {
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  color: var(--texto);
+  margin: var(--space-3) 0 var(--space-1);
+}
+.acciones-factura {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Formulario de abono, contextual a una factura puntual dentro de la
+   ficha — fondo rosa claro (el mismo que ya usa toda la app), no suma al
+   presupuesto de lila/verde menta. */
+.abono-inline {
+  background: var(--rosa-claro);
+  border-radius: var(--radio-chico);
+  padding: var(--space-2);
+  margin: 6px 0;
+}
+.abono-inline .form-grid-3col {
+  margin-bottom: 0;
+}
+.abono-saldo-referencia {
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+  margin-top: 4px;
+}
+.abono-saldo-referencia.excede {
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* --- 17. Vista de login ------------------------------------------------------ */
 .login-container {
   min-height: 100vh;
   display: flex;

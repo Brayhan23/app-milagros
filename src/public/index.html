@@ -143,6 +143,16 @@
       <path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59" />
       <path d="M21 15V5a2 2 0 0 0-2-2H9" />
     </symbol>
+    <symbol id="icon-pencil" viewBox="0 0 24 24">
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+      <path d="m15 5 4 4" />
+    </symbol>
+    <symbol id="icon-user-x" viewBox="0 0 24 24">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="17" x2="22" y1="8" y2="13" />
+      <line x1="22" x2="17" y1="8" y2="13" />
+    </symbol>
   </svg>
 
   <!-- Vista: Login -->
@@ -515,8 +525,15 @@
       <div id="tab-clientes" class="tab-panel hidden">
 
         <section class="card">
-          <h2><svg class="icon"><use href="#icon-user"></use></svg> Agregar cliente</h2>
-          <form id="form-cliente" class="form-grid-2col">
+          <div class="card-header">
+            <h2><svg class="icon"><use href="#icon-users"></use></svg> Clientes</h2>
+            <button type="button" id="btn-mostrar-form-cliente" class="btn btn-secondary">
+              <svg class="icon icon-sm"><use href="#icon-user"></use></svg> Nuevo cliente
+            </button>
+          </div>
+
+          <form id="form-cliente" class="form-grid-2col hidden">
+            <input type="hidden" id="cliente-id-editando" value="">
             <div class="form-group">
               <label for="cliente-nombre">Nombre *</label>
               <input type="text" id="cliente-nombre" placeholder="Ej: Juan Pérez" required>
@@ -539,68 +556,31 @@
               </label>
             </div>
             <div class="form-actions span-2">
-              <button type="submit" class="btn btn-primary">Guardar cliente</button>
+              <button type="submit" id="btn-guardar-cliente" class="btn btn-primary">Guardar cliente</button>
+              <button type="button" id="btn-cancelar-form-cliente" class="btn btn-neutral">Cancelar</button>
             </div>
           </form>
           <div id="mensaje-cliente" class="mensaje"></div>
-        </section>
 
-        <section class="card">
-          <div class="card-header">
-            <h2><svg class="icon"><use href="#icon-wallet"></use></svg> Clientes que deben</h2>
-            <button id="btn-cargar-deudores" type="button" class="btn btn-secondary">Actualizar lista</button>
-          </div>
-          <div class="table-responsive">
-            <table class="tabla-inventario">
-              <thead>
-                <tr>
-                  <th>N.°</th>
-                  <th>Cliente</th>
-                  <th>Documento</th>
-                  <th>Saldo pendiente</th>
-                  <th>Antigüedad</th>
-                </tr>
-              </thead>
-              <tbody id="tabla-body-deudores">
-                <tr>
-                  <td colspan="5" class="empty-state">Cargando deudores...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="card">
-          <h2><svg class="icon"><use href="#icon-file-text"></use></svg> Buscar deuda de un cliente</h2>
-          <div class="form-grid-3col">
-            <div class="form-group">
-              <label for="deuda-cliente-id">Número del cliente</label>
-              <input type="number" id="deuda-cliente-id" placeholder="Ej: 1">
+          <div class="clientes-layout">
+            <div class="clientes-lista-col">
+              <div class="form-group clientes-buscar">
+                <label for="clientes-buscar-input">
+                  <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por nombre o documento
+                </label>
+                <input type="text" id="clientes-buscar-input" placeholder="Ej: Juan, 123456789…" autocomplete="off">
+              </div>
+              <div id="clientes-lista" class="clientes-lista">
+                <p class="empty-state">Cargando clientes…</p>
+              </div>
             </div>
-            <div class="form-actions">
-              <button type="button" id="btn-ver-deuda" class="btn btn-secondary">Consultar</button>
+
+            <div class="clientes-ficha-col">
+              <div id="cliente-ficha" class="cliente-ficha">
+                <p class="empty-state">Seleccioná un cliente de la lista para ver su información completa.</p>
+              </div>
             </div>
           </div>
-          <p class="empty-state">"Ver factura" abre el comprobante completo en la pestaña Facturas.</p>
-          <div id="detalle-deuda"></div>
-        </section>
-
-        <section class="card">
-          <h2><svg class="icon"><use href="#icon-banknote"></use></svg> Registrar pago (abono)</h2>
-          <form id="form-abono" class="form-grid-3col">
-            <div class="form-group">
-              <label for="abono-venta-id">Número de la factura (a crédito)</label>
-              <input type="number" id="abono-venta-id" placeholder="Ej: 3" required>
-            </div>
-            <div class="form-group">
-              <label for="abono-monto">Monto del pago ($)</label>
-              <input type="number" id="abono-monto" min="1" placeholder="Ej: 20000" required>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Registrar pago</button>
-            </div>
-          </form>
-          <div id="mensaje-abono" class="mensaje"></div>
         </section>
 
       </div>
