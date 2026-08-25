@@ -484,8 +484,10 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
+/* Hover de fila: uno de los pocos usos permitidos del lila — un detalle
+   pequeño y transitorio, nunca una superficie fija. */
 .tabla-inventario tbody tr:hover {
-  background: #fafafa;
+  background: rgba(218, 201, 223, 0.25);
 }
 .tabla-inventario tr.fila-mora {
   background: var(--error-fondo);
@@ -576,7 +578,7 @@ a {
 .resumen-totales {
   margin-top: var(--space-2);
   padding-top: var(--space-1);
-  border-top: 1px solid var(--borde);
+  border-top: 1px solid var(--lila);
   text-align: right;
 }
 .resumen-totales p {
@@ -645,7 +647,186 @@ a {
   }
 }
 
-/* --- 15. Vista de login ------------------------------------------------------ */
+/* --- 15. Pantalla de venta (escaneo + carrito + resumen) ------------------ */
+.venta-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .venta-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Campo de escaneo: protagonista de la pantalla más usada de la app —
+   grande, con foco visible marcado, para que sea imposible no verlo. */
+.venta-scan {
+  margin-bottom: var(--space-2);
+}
+.venta-scan-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  color: var(--rosa);
+  margin-bottom: 6px;
+}
+.venta-scan-input {
+  width: 100%;
+  padding: 16px 18px;
+  border: 2px solid var(--rosa);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-lg);
+  font-family: inherit;
+  background: var(--blanco);
+  transition: box-shadow var(--transicion);
+}
+.venta-scan-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(194, 24, 91, 0.15);
+}
+
+/* Búsqueda manual: mismo tipo de campo, deliberadamente más chico y
+   discreto que el de escaneo — es el respaldo, no el flujo principal. */
+.venta-busqueda {
+  margin-bottom: var(--space-2);
+}
+.venta-busqueda > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  color: var(--texto-suave);
+  margin-bottom: 6px;
+}
+.venta-busqueda-caja {
+  position: relative;
+}
+.venta-busqueda-caja input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-sm);
+  font-family: inherit;
+}
+.venta-busqueda-caja input:focus {
+  outline: none;
+  border-color: var(--rosa);
+}
+.venta-busqueda-resultados {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--blanco);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  box-shadow: var(--sombra);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.resultado-busqueda-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--borde);
+  background: none;
+  font-size: var(--texto-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+.resultado-busqueda-item:last-child {
+  border-bottom: none;
+}
+.resultado-busqueda-item:hover,
+.resultado-busqueda-item:focus-visible {
+  background: var(--rosa-claro);
+  outline: none;
+}
+.resultado-busqueda-stock {
+  color: var(--texto-suave);
+  font-size: var(--texto-xs);
+  white-space: nowrap;
+}
+.venta-busqueda-vacia {
+  padding: 10px 12px;
+  color: var(--texto-suave);
+  font-size: var(--texto-sm);
+}
+
+.venta-carrito-tabla {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* Cantidad ajustable directo en la fila del carrito. */
+.cantidad-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-cantidad {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  background: var(--blanco);
+  color: var(--rosa);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+.btn-cantidad:hover {
+  background: var(--rosa-claro);
+}
+.input-cantidad-linea {
+  width: 48px;
+  padding: 4px;
+  text-align: center;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-sm);
+  font-family: inherit;
+}
+.input-cantidad-linea:focus {
+  outline: none;
+  border-color: var(--rosa);
+}
+
+/* Panel de resumen: pegado (sticky) para que el total nunca se pierda de
+   vista mientras se sigue escaneando o ajustando el carrito. Blanco, como
+   cualquier tarjeta — el rosa es el único color dominante de la pantalla,
+   así que este panel no compite con él. El borde en lila es el único
+   detalle de color: una línea fina, no una superficie. */
+.venta-resumen {
+  position: sticky;
+  top: var(--space-2);
+  border: 1px solid var(--lila);
+  border-radius: var(--radio);
+  padding: var(--space-2);
+  background: var(--blanco);
+}
+.venta-resumen .resumen-totales {
+  margin-top: var(--space-1);
+}
+
+/* --- 16. Vista de login ------------------------------------------------------ */
 .login-container {
   min-height: 100vh;
   display: flex;

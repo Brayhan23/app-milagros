@@ -189,6 +189,7 @@ document.querySelectorAll('.tab-btn').forEach(boton => {
     if (boton.dataset.tab === 'facturas') {
       cargarProductosParaVenta();
       cargarClientesParaVenta();
+      enfocarCodigoBarras();
     }
 
     if (boton.dataset.tab === 'configuracion') {
@@ -525,9 +526,15 @@ async function cargarStockTiempoReal() {
 
 // --- VENTAS Y FACTURACIÓN ---
 
-const selectVentaProducto = document.getElementById('venta-producto');
-const inputVentaCantidad = document.getElementById('venta-cantidad');
-const btnAgregarItem = document.getElementById('btn-agregar-item');
+// Escaneo de código de barras: campo protagonista de esta pantalla.
+const formCodigoBarras = document.getElementById('form-codigo-barras');
+const inputCodigoBarras = document.getElementById('venta-codigo-barras');
+
+// Búsqueda manual por nombre: respaldo para productos sin código de barras
+// o si falla el lector.
+const inputBuscarProducto = document.getElementById('venta-buscar-producto');
+const contenedorBusquedaResultados = document.getElementById('venta-busqueda-resultados');
+
 const tablaBodyCarrito = document.getElementById('tabla-body-carrito');
 const selectTipoCliente = document.getElementById('venta-tipo-cliente');
 const selectMetodoPago = document.getElementById('venta-metodo-pago');
@@ -552,19 +559,17 @@ let productosDisponibles = [];
 let clientesDisponibles = [];
 let carrito = [];
 let ventaActualId = null;
+// Resultados de la búsqueda manual actualmente mostrados en el desplegable
+// (para poder resolver "Enter = agregar el primero" y los clics por índice).
+let resultadosBusqueda = [];
 
 async function cargarProductosParaVenta() {
   try {
     const res = await fetch(`${API_URL}/productos`, { headers: obtenerHeaders() });
     const data = await res.json();
     productosDisponibles = data.exito ? data.productos : [];
-
-    selectVentaProducto.innerHTML = productosDisponibles
-      .map((p) => `<option value="${p.id}">${escaparHtml(p.nombre)} (stock: ${p.stock_actual})</option>`)
-      .join('') || '<option value="">No hay productos disponibles</option>';
-    actualizarMaximoCantidad();
   } catch (err) {
-    selectVentaProducto.innerHTML = '<option value="">Error al cargar productos</option>';
+    productosDisponibles = [];
   }
 }
 
@@ -582,6 +587,19 @@ async function cargarClientesParaVenta() {
   }
 }
 
+// Reemplaza (o agrega, si no estaba) la versión en memoria de un producto —
+// se usa después de cada escaneo, que trae el dato más fresco de stock
+// directo del servidor, para que la validación de cantidad de las líneas
+// siguientes no trabaje con un stock desactualizado.
+function actualizarProductoEnCache(producto) {
+  const indice = productosDisponibles.findIndex((p) => p.id === producto.id);
+  if (indice >= 0) {
+    productosDisponibles[indice] = producto;
+  } else {
+    productosDisponibles.push(producto);
+  }
+}
+
 function actualizarVisibilidadCliente() {
   const esCredito = selectMetodoPago.value === 'credito';
   grupoVentaCliente.classList.toggle('hidden', !esCredito);
@@ -592,52 +610,154 @@ function precioUnitarioActual(producto) {
   return selectTipoCliente.value === 'mayor' ? producto.precio_mayor : producto.precio_detal;
 }
 
-function actualizarMaximoCantidad() {
-  const producto = productosDisponibles.find((p) => p.id === Number(selectVentaProducto.value));
-  inputVentaCantidad.max = producto ? producto.stock_actual : '';
+// Pone el foco en el campo de escaneo y selecciona lo que tenga adentro
+// (por si quedó algo sin limpiar): así la cajera puede escanear el
+// siguiente producto sin tocar el mouse ni el teclado más que con el lector.
+function enfocarCodigoBarras() {
+  inputCodigoBarras.focus();
+  inputCodigoBarras.select();
 }
-selectVentaProducto.addEventListener('change', actualizarMaximoCantidad);
 
-btnAgregarItem.addEventListener('click', () => {
-  const productoId = Number(selectVentaProducto.value);
-  const cantidad = Number(inputVentaCantidad.value);
-  const producto = productosDisponibles.find((p) => p.id === productoId);
-
-  if (!producto) {
-    mostrarMensaje(mensajeVenta, 'Elegí un producto válido.', 'error');
-    return;
-  }
-  if (!Number.isInteger(cantidad) || cantidad <= 0) {
-    mostrarMensaje(mensajeVenta, 'La cantidad debe ser un número entero mayor a cero.', 'error');
-    return;
-  }
-
-  const existente = carrito.find((item) => item.productoId === productoId);
+// Punto único donde un producto entra al carrito, ya sea por escaneo o por
+// búsqueda manual: si ya estaba en la venta, suma a la cantidad existente
+// en vez de duplicar la línea. Valida contra el stock disponible ANTES de
+// agregar — nunca se agrega algo que después haya que corregir.
+function agregarProductoAlCarrito(producto, cantidadAAgregar = 1) {
+  const existente = carrito.find((item) => item.productoId === producto.id);
   const cantidadYaEnCarrito = existente ? existente.cantidad : 0;
+  const cantidadTotal = cantidadYaEnCarrito + cantidadAAgregar;
 
-  if (cantidadYaEnCarrito + cantidad > producto.stock_actual) {
+  if (cantidadTotal > producto.stock_actual) {
     mostrarMensaje(
       mensajeVenta,
-      `Stock insuficiente para "${producto.nombre}": disponible ${producto.stock_actual}, ya tenés ${cantidadYaEnCarrito} en la venta.`,
+      `Stock insuficiente para "${producto.nombre}": disponible ${producto.stock_actual}${
+        cantidadYaEnCarrito > 0 ? `, ya tenés ${cantidadYaEnCarrito} en la venta` : ''
+      }.`,
       'error'
     );
-    return;
+    return false;
   }
 
   mostrarMensaje(mensajeVenta, '', null);
-
   if (existente) {
-    existente.cantidad += cantidad;
+    existente.cantidad = cantidadTotal;
   } else {
-    carrito.push({ productoId, nombre: producto.nombre, cantidad });
+    carrito.push({ productoId: producto.id, nombre: producto.nombre, cantidad: cantidadAAgregar });
+  }
+  renderizarCarrito();
+  return true;
+}
+
+// --- Escaneo de código de barras ---
+// El lector USB actúa como un teclado: escribe el código y manda un Enter
+// solo, que este <form> recibe como un submit normal — no hace falta
+// distinguir "tecleado a mano" de "leído por el escáner".
+formCodigoBarras.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const codigo = inputCodigoBarras.value.trim();
+  inputCodigoBarras.value = '';
+
+  if (!codigo) {
+    enfocarCodigoBarras();
+    return;
   }
 
-  renderizarCarrito();
+  try {
+    const res = await fetch(`${API_URL}/productos/${encodeURIComponent(codigo)}`, { headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeVenta, data.mensaje || `No se encontró ningún producto con ese código.`, 'error');
+      return;
+    }
+
+    actualizarProductoEnCache(data.producto);
+    agregarProductoAlCarrito(data.producto, 1);
+  } catch (err) {
+    mostrarMensaje(mensajeVenta, 'Error de conexión al buscar el producto.', 'error');
+  } finally {
+    // Sin confirmación intermedia y con el foco siempre listo para el
+    // siguiente escaneo, exista o no haya existido el producto.
+    enfocarCodigoBarras();
+  }
 });
 
+// --- Búsqueda manual por nombre (respaldo) ---
+// Filtra en memoria sobre productosDisponibles, ya cargado por
+// cargarProductosParaVenta(): NUNCA dispara una petición por cada tecla.
+function renderizarResultadosBusqueda() {
+  if (resultadosBusqueda.length === 0) {
+    contenedorBusquedaResultados.innerHTML = '<p class="venta-busqueda-vacia">Sin resultados.</p>';
+    contenedorBusquedaResultados.classList.remove('hidden');
+    return;
+  }
+
+  contenedorBusquedaResultados.innerHTML = resultadosBusqueda
+    .map(
+      (p, indice) => `
+      <button type="button" class="resultado-busqueda-item" data-indice="${indice}">
+        <span>${escaparHtml(p.nombre)}</span>
+        <span class="resultado-busqueda-stock">stock: ${p.stock_actual}</span>
+      </button>
+    `
+    )
+    .join('');
+  contenedorBusquedaResultados.classList.remove('hidden');
+}
+
+function cerrarResultadosBusqueda() {
+  resultadosBusqueda = [];
+  contenedorBusquedaResultados.innerHTML = '';
+  contenedorBusquedaResultados.classList.add('hidden');
+}
+
+function seleccionarResultadoBusqueda(indice) {
+  const producto = resultadosBusqueda[indice];
+  if (!producto) return;
+  agregarProductoAlCarrito(producto, 1);
+  inputBuscarProducto.value = '';
+  cerrarResultadosBusqueda();
+  // Vuelve el foco al escaneo, que es el flujo principal de esta pantalla.
+  enfocarCodigoBarras();
+}
+
+inputBuscarProducto.addEventListener('input', () => {
+  const termino = inputBuscarProducto.value.trim().toLowerCase();
+  if (!termino) {
+    cerrarResultadosBusqueda();
+    return;
+  }
+
+  resultadosBusqueda = productosDisponibles
+    .filter((p) => p.activo !== 0 && p.nombre.toLowerCase().includes(termino))
+    .slice(0, 8);
+  renderizarResultadosBusqueda();
+});
+
+inputBuscarProducto.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (resultadosBusqueda.length > 0) seleccionarResultadoBusqueda(0);
+  }
+});
+
+contenedorBusquedaResultados.addEventListener('click', (e) => {
+  const boton = e.target.closest('.resultado-busqueda-item');
+  if (!boton) return;
+  seleccionarResultadoBusqueda(Number(boton.dataset.indice));
+});
+
+// Cierra el desplegable de resultados al hacer clic fuera de la búsqueda.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.venta-busqueda')) {
+    cerrarResultadosBusqueda();
+  }
+});
+
+// --- Carrito: líneas con cantidad ajustable ---
 function renderizarCarrito() {
   if (carrito.length === 0) {
-    tablaBodyCarrito.innerHTML = `<tr><td colspan="5" class="empty-state">Todavía no agregaste productos.</td></tr>`;
+    tablaBodyCarrito.innerHTML = `<tr><td colspan="5" class="empty-state">Escaneá o buscá un producto para empezar.</td></tr>`;
     actualizarTotales();
     return;
   }
@@ -647,13 +767,28 @@ function renderizarCarrito() {
       const producto = productosDisponibles.find((p) => p.id === item.productoId);
       const precioUnitario = producto ? precioUnitarioActual(producto) : 0;
       const subtotal = precioUnitario * item.cantidad;
+      const stockMaximo = producto ? producto.stock_actual : item.cantidad;
       return `
         <tr>
           <td>${escaparHtml(item.nombre)}</td>
-          <td>${item.cantidad}</td>
           <td>${formatearPesos(precioUnitario)}</td>
+          <td>
+            <div class="cantidad-control">
+              <button type="button" class="btn-cantidad btn-cantidad-menos" data-indice="${indice}" aria-label="Restar una unidad">−</button>
+              <input
+                type="number"
+                class="input-cantidad-linea"
+                data-indice="${indice}"
+                value="${item.cantidad}"
+                min="1"
+                max="${stockMaximo}"
+                inputmode="numeric"
+              >
+              <button type="button" class="btn-cantidad btn-cantidad-mas" data-indice="${indice}" aria-label="Sumar una unidad">+</button>
+            </div>
+          </td>
           <td>${formatearPesos(subtotal)}</td>
-          <td><button type="button" class="btn btn-secondary btn-sm btn-quitar-item" data-indice="${indice}">Quitar</button></td>
+          <td><button type="button" class="btn btn-neutral btn-sm btn-quitar-item" data-indice="${indice}" title="Quitar producto">${icono('x', 'icon-sm')}</button></td>
         </tr>
       `;
     })
@@ -662,11 +797,62 @@ function renderizarCarrito() {
   actualizarTotales();
 }
 
-tablaBodyCarrito.addEventListener('click', (e) => {
-  const boton = e.target.closest('.btn-quitar-item');
-  if (!boton) return;
-  carrito.splice(Number(boton.dataset.indice), 1);
+// Cambia la cantidad de una línea ya existente, validando contra el stock
+// disponible de ese producto. Usado por los botones +/− y por el campo
+// editable de cantidad.
+function ajustarCantidadLinea(indice, nuevaCantidad) {
+  const item = carrito[indice];
+  if (!item) return;
+
+  const producto = productosDisponibles.find((p) => p.id === item.productoId);
+  const stockDisponible = producto ? producto.stock_actual : item.cantidad;
+
+  if (!Number.isInteger(nuevaCantidad) || nuevaCantidad < 1) {
+    nuevaCantidad = 1;
+  }
+  if (nuevaCantidad > stockDisponible) {
+    mostrarMensaje(
+      mensajeVenta,
+      `Solo hay ${stockDisponible} unidad(es) disponibles de "${item.nombre}".`,
+      'error'
+    );
+    nuevaCantidad = stockDisponible;
+  } else {
+    mostrarMensaje(mensajeVenta, '', null);
+  }
+
+  item.cantidad = nuevaCantidad;
   renderizarCarrito();
+}
+
+tablaBodyCarrito.addEventListener('click', (e) => {
+  const btnQuitar = e.target.closest('.btn-quitar-item');
+  if (btnQuitar) {
+    carrito.splice(Number(btnQuitar.dataset.indice), 1);
+    renderizarCarrito();
+    return;
+  }
+
+  const btnMenos = e.target.closest('.btn-cantidad-menos');
+  if (btnMenos) {
+    const indice = Number(btnMenos.dataset.indice);
+    ajustarCantidadLinea(indice, carrito[indice].cantidad - 1 || 1);
+    return;
+  }
+
+  const btnMas = e.target.closest('.btn-cantidad-mas');
+  if (btnMas) {
+    const indice = Number(btnMas.dataset.indice);
+    ajustarCantidadLinea(indice, carrito[indice].cantidad + 1);
+  }
+});
+
+// 'change' (no 'input'): solo valida/re-renderiza cuando la cajera termina
+// de editar el campo (blur o Enter), no en cada tecla mientras escribe.
+tablaBodyCarrito.addEventListener('change', (e) => {
+  const input = e.target.closest('.input-cantidad-linea');
+  if (!input) return;
+  ajustarCantidadLinea(Number(input.dataset.indice), Number(input.value));
 });
 
 selectTipoCliente.addEventListener('change', renderizarCarrito);
@@ -680,13 +866,26 @@ function calcularSubtotal() {
   }, 0);
 }
 
+// Mismo desglose de IVA que ventasService.calcularDesgloseIva en el backend
+// (base = total / (1 + tasa/100), IVA = residuo): se muestra en vivo acá
+// mientras se arma la venta, con la MISMA fórmula que después confirma el
+// servidor — nunca dos cuentas independientes que puedan no coincidir.
+function calcularDesgloseIva(total, ivaPorcentaje) {
+  const baseGravable = Math.round(total / (1 + ivaPorcentaje / 100));
+  return { baseGravable, ivaMonto: total - baseGravable };
+}
+
 function actualizarTotales() {
   const subtotal = calcularSubtotal();
   const descuento = Number(inputDescuento.value) || 0;
   const total = Math.max(subtotal - descuento, 0);
+  const ivaPorcentaje = (configuracionActual && configuracionActual.iva_porcentaje) ?? 19;
+  const { ivaMonto } = calcularDesgloseIva(total, ivaPorcentaje);
 
   document.getElementById('venta-subtotal').textContent = formatearPesos(subtotal);
   document.getElementById('venta-descuento-resumen').textContent = formatearPesos(descuento);
+  document.getElementById('venta-iva-porcentaje').textContent = ivaPorcentaje;
+  document.getElementById('venta-iva-monto').textContent = formatearPesos(ivaMonto);
   document.getElementById('venta-total').textContent = formatearPesos(total);
 }
 
@@ -694,7 +893,7 @@ btnGenerarFactura.addEventListener('click', async () => {
   mostrarMensaje(mensajeVenta, '', null);
 
   if (carrito.length === 0) {
-    mostrarMensaje(mensajeVenta, 'Agregá al menos un producto para generar la factura.', 'error');
+    mostrarMensaje(mensajeVenta, 'Escaneá o agregá al menos un producto para confirmar la venta.', 'error');
     return;
   }
 
@@ -721,7 +920,7 @@ btnGenerarFactura.addEventListener('click', async () => {
     const data = await res.json();
 
     if (!data.exito) {
-      mostrarMensaje(mensajeVenta, data.mensaje || 'No se pudo generar la factura.', 'error');
+      mostrarMensaje(mensajeVenta, data.mensaje || 'No se pudo confirmar la venta.', 'error');
       return;
     }
 
@@ -735,7 +934,7 @@ btnGenerarFactura.addEventListener('click', async () => {
     cargarStockTiempoReal();
     cargarAlertasStock();
   } catch (err) {
-    mostrarMensaje(mensajeVenta, 'Error de conexión al generar la factura.', 'error');
+    mostrarMensaje(mensajeVenta, 'Error de conexión al confirmar la venta.', 'error');
   }
 });
 
@@ -782,6 +981,7 @@ btnNuevaVenta.addEventListener('click', () => {
   facturaGenerada.classList.add('hidden');
   seccionVenta.classList.remove('hidden');
   ventaActualId = null;
+  enfocarCodigoBarras();
 });
 
 // --- ENVIAR FACTURA POR CORREO ---
@@ -944,8 +1144,13 @@ btnVerDeuda.addEventListener('click', async () => {
       ? data.abonos.map((a) => `<li>Factura N.° ${a.venta_id}: ${formatearPesos(a.monto)} (${formatearFecha(a.creado_en)})</li>`).join('')
       : '<li class="empty-state">Sin abonos registrados.</li>';
 
+    const saldoTexto =
+      data.saldoTotal === 0
+        ? `<span class="badge badge-ok">${icono('circle-check', 'icon-sm')} Al día — deuda saldada</span>`
+        : `<strong>${formatearPesos(data.saldoTotal)}</strong>`;
+
     detalleDeuda.innerHTML = `
-      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: <strong>${formatearPesos(data.saldoTotal)}</strong></p>
+      <p><strong>${escaparHtml(data.cliente.nombre)}</strong> — Saldo total pendiente: ${saldoTexto}</p>
       <table class="tabla-inventario">
         <thead>
           <tr><th>Factura</th><th>Fecha</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Ver</th></tr>
@@ -1131,7 +1336,7 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
     <p>Total facturado: <strong>${formatearPesos(resumen.totalFacturado)}</strong></p>
     <p>Dinero recibido en ventas (efectivo/transferencia): <strong>${formatearPesos(resumen.dineroRecibidoVentas)}</strong></p>
     <p>Abonos recibidos (pagos de ventas a crédito): <strong>${formatearPesos(resumen.abonosRecibidos)}</strong></p>
-    <p>Dinero total recibido en caja: <strong>${formatearPesos(resumen.dineroRecibidoTotal)}</strong></p>
+    <p>Dinero total recibido en caja: <span class="badge badge-ok">${formatearPesos(resumen.dineroRecibidoTotal)}</span></p>
     <p>Ganancia: <strong>${formatearPesos(resumen.gananciaTotal)}</strong>${
     resumen.gananciaAproximada
       ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
@@ -1261,7 +1466,7 @@ function renderizarListadoVentas(tbody, ventas) {
         <td>${v.id}</td>
         <td>${formatearFecha(v.creado_en)}</td>
         <td>${escaparHtml(v.nombre_cliente) || 'Mostrador'}</td>
-        <td>${ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago}</td>
+        <td><span class="badge badge-neutro">${ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago}</span></td>
         <td>${formatearPesos(v.total)}</td>
         <td><button type="button" class="btn btn-secondary btn-sm btn-ver-factura" data-venta-id="${v.id}">Ver factura</button></td>
       </tr>

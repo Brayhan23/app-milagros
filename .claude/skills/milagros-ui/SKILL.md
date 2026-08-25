@@ -21,10 +21,10 @@ Definir siempre como variables CSS en `:root`, nunca colores sueltos repartidos 
 ```css
 :root {
   /* Marca */
-  --rosa: #C2185B;           /* Color principal: títulos, botones primarios, acentos */
+  --rosa: #C2185B;           /* Único color dominante: títulos, botones primarios, acentos */
   --rosa-claro: #FDF2F5;     /* Fondo general de la app */
-  --lila: #DAC9DF;           /* Color secundario */
-  --verde-menta: #D0FDD7;    /* Color de apoyo */
+  --lila: #DAC9DF;           /* Acento de detalle — nunca superficie */
+  --verde-menta: #D0FDD7;    /* Acento de confirmación — nunca superficie */
 
   /* Neutros */
   --texto: #2B2B2B;
@@ -33,25 +33,65 @@ Definir siempre como variables CSS en `:root`, nunca colores sueltos repartidos 
   --blanco: #FFFFFF;
 
   /* Estados (derivados de la paleta, no colores nuevos al azar) */
-  --exito: var(--verde-menta);
+  --exito: #1E7A34;          /* verde oscuro: texto/ícono sobre --verde-menta, contraste ~4.8:1 */
+  --exito-fondo: var(--verde-menta);
   --alerta: #F5A623;
   --error: #C62828;
 }
 ```
 
+**Regla de dominancia — la que manda sobre todas las demás de esta sección:** el rosa es el
+ÚNICO color dominante de la interfaz. Ningún otro color le hace competencia. Lila y verde menta
+son **acentos**, no superficies: en cualquier pantalla, el área total cubierta por lila +
+verde menta (sumando ambos) no debe superar aproximadamente el **5% de la pantalla**. Si al
+mirar una pantalla terminada el ojo duda entre dos colores "principales", algo se aplicó mal —
+casi siempre porque lila o verde menta se usaron como fondo de una superficie grande en vez de
+como detalle.
+
 **Cómo usar cada color:**
 
-- **Rosa** (`--rosa`): identidad de la marca. Títulos de sección, botón principal de cada
-  pantalla (uno solo por pantalla), pestaña activa, enlaces. No lo uses para todo — pierde fuerza.
-- **Rosa claro** (`--rosa-claro`): fondo de la aplicación completa. Las tarjetas van en blanco
-  encima de este fondo.
-- **Lila** (`--lila`): elementos secundarios — encabezados de tabla, fondos de secciones
-  informativas, badges neutros, estados "en proceso". Nunca para acciones destructivas.
-- **Verde menta** (`--verde-menta`): confirmaciones y estados positivos — "venta registrada",
-  "deuda saldada", stock saludable, mensajes de éxito.
+- **Rosa** (`--rosa`): identidad de la marca y único color dominante. Títulos de sección, botón
+  principal de cada pantalla (uno solo por pantalla), pestaña activa (texto + subrayado),
+  enlaces. No lo uses para todo — pierde fuerza.
+- **Rosa claro** (`--rosa-claro`): fondo de la aplicación completa. Las tarjetas y paneles van en
+  **blanco** encima de este fondo — todos, sin excepción, incluyendo barras laterales y paneles
+  de resumen.
+- **Lila** (`--lila`): SOLO en detalles pequeños:
+  - bordes finos (1–2px) de tarjetas o paneles;
+  - líneas divisorias entre secciones dentro de una tarjeta;
+  - fondo de hover al pasar el mouse sobre una fila de tabla (transitorio, nunca fijo);
+  - badges pequeños de información neutra (tipo de cliente, método de pago).
+  **Nunca** como fondo de un panel, tarjeta, barra lateral, o encabezado de tabla completo —
+  el lila y el rosa son tonos cercanos con distinta saturación, y dos colores dominantes
+  compitiendo en la misma pantalla no funcionan juntos. Nunca en acciones destructivas.
+- **Verde menta** (`--verde-menta`): SOLO en:
+  - mensajes de éxito que aparecen y desaparecen solos;
+  - badges pequeños de estado positivo (stock saludable, deuda saldada, cliente al día).
+  Nada más — ni fondos de fila, ni paneles, ni texto de totales.
+
+**Contraste sobre fondos claros:** `--lila` y `--verde-menta` son colores claros — texto gris
+medio (`--texto-suave`, #6B6B6B) pierde legibilidad encima (contraste ~3.4:1, por debajo del
+mínimo de 4.5:1). Como ambos quedaron limitados a detalles pequeños (badges, bordes, hover), en
+la práctica el texto que va directamente sobre un fondo lila o verde menta sólido es casi
+siempre el texto corto de un badge: usa `--texto` (~8.7:1 sobre lila) o `--exito` (~4.8:1 sobre
+verde menta) para ese texto, nunca `--texto-suave` ni negro puro.
 
 Regla: si necesitas un color que no está en la paleta, primero intenta resolverlo con opacidad
 o con un tono derivado de los existentes.
+
+### Dónde está aplicado hoy (referencia para fases 3, 4 y 5)
+
+- **Lila:** borde de 1px en `.venta-resumen` (el panel de resumen de la venta, que es blanco);
+  borde superior de 1px en `.resumen-totales` como línea divisoria antes del total; fondo de
+  hover en filas de tabla (`.tabla-inventario tbody tr:hover`, un tinte de lila al 25% de
+  opacidad, transitorio); badges neutros (`.badge-neutro`) para tipo de cliente y método de pago
+  en la factura generada y en los listados de ventas.
+- **Verde menta:** mensajes de éxito (`.mensaje.exito`); badge de stock saludable (`badge-ok` en
+  el inventario); badge "Al día — deuda saldada" en el detalle de deuda de un cliente cuando el
+  saldo llega a $0; badge de dinero recibido en el resumen de Reportes.
+- Encabezados de tabla, la pestaña activa y el panel de resumen de la venta volvieron a su
+  versión neutra (rosa claro/rosa o blanco) después de un primer intento que los pintó de lila
+  como superficie completa — quedó mal, competía con el rosa. No repetir ese error.
 
 ## Iconos
 
