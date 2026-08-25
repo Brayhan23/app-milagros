@@ -437,6 +437,13 @@ a {
   background: var(--alerta-fondo);
   color: #8a5a00;
 }
+.mensaje-lista {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.mensaje-lista li {
+  margin-top: 2px;
+}
 
 @keyframes aparecer {
   from {

@@ -171,6 +171,33 @@ function mostrarMensaje(elemento, texto, tipo) {
   `;
 }
 
+// Variante de mostrarMensaje() para cuando además del mensaje principal hay
+// una lista de advertencias no bloqueantes que mostrar (ej. las de
+// coherencia de precios que devuelve POST/PUT /productos). Se usa el mismo
+// tipo "alerta" (naranja) que ya existe en el sistema de diseño para "esto
+// no es un error, pero revisalo" — nunca "error", porque la operación sí se
+// completó. Sin advertencias, delega en mostrarMensaje() para no duplicar
+// esa lógica.
+function mostrarMensajeConAdvertencias(elemento, texto, advertencias) {
+  if (!advertencias || advertencias.length === 0) {
+    mostrarMensaje(elemento, texto, 'exito');
+    return;
+  }
+
+  elemento.className = 'mensaje alerta';
+  elemento.innerHTML = `
+    <div class="mensaje-caja">
+      ${icono('alert-triangle', 'icon-sm')}
+      <div>
+        <span>${escaparHtml(texto)}</span>
+        <ul class="mensaje-lista">
+          ${advertencias.map((a) => `<li>${escaparHtml(a)}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
 function obtenerHeaders() {
   const token = localStorage.getItem('token');
   return {
@@ -754,12 +781,14 @@ formProducto.addEventListener('submit', async (e) => {
       return;
     }
 
-    let msg = idEditando ? `Producto "${data.producto.nombre}" actualizado.` : `Producto "${data.producto.nombre}" registrado.`;
-    if (data.advertencias && data.advertencias.length > 0) {
-      msg += ` (Advertencia: ${data.advertencias.join(' ')})`;
-    }
-    mostrarMensaje(mensajeProducto, msg, 'exito');
+    const msg = idEditando ? `Producto "${data.producto.nombre}" actualizado.` : `Producto "${data.producto.nombre}" registrado.`;
+    // cerrarFormProducto() limpia mensajeProducto como parte de resetear el
+    // formulario — por eso el mensaje final se muestra DESPUÉS de cerrarlo,
+    // nunca antes: si no, cerrarFormProducto() lo borraba en el mismo tick y
+    // la usuaria nunca llegaba a verlo (pasaba con las advertencias de
+    // coherencia de precios, que solo viven en esta respuesta).
     cerrarFormProducto();
+    mostrarMensajeConAdvertencias(mensajeProducto, msg, data.advertencias);
     cargarProductosPantalla();
   } catch (err) {
     mostrarMensaje(mensajeProducto, 'Error de conexión al guardar el producto.', 'error');
@@ -1198,6 +1227,14 @@ function mostrarFactura(venta) {
   document.getElementById('factura-total').textContent = formatearPesos(venta.total);
   document.getElementById('factura-iva-porcentaje').textContent = venta.ivaPorcentaje;
   document.getElementById('factura-iva-monto').textContent = formatearPesos(venta.ivaMonto);
+  // Mismo dato y misma aclaración que ya muestra la copia por correo
+  // (emailService.construirHtmlFactura): sin esto, la factura en pantalla
+  // (y la que se imprime) decía algo distinto de la que llega al correo del
+  // cliente para la misma venta. textContent (no innerHTML) porque es texto
+  // plano fijo, sin necesidad de escaparHtml.
+  document.getElementById('factura-iva-aproximado').textContent = venta.ivaAproximado
+    ? ' (aproximado, venta anterior a la configuración de IVA)'
+    : '';
 
   document.getElementById('factura-items').innerHTML = venta.items
     .map(
@@ -1976,6 +2013,13 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
     ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
     : '';
 
+  // Mismo dato que ya se ve en el Excel/PDF exportado (exportacionService.js)
+  // pero antes no aparecía en este resumen en pantalla — la usuaria tenía
+  // que descargar un archivo solo para saber cuánto IVA recaudó.
+  const notaIvaAproximada = resumen.ivaAproximado
+    ? ' <em>(incluye ventas registradas antes de configurar el IVA; para esas se usó el % de IVA actual del negocio como aproximación)</em>'
+    : '';
+
   contenedor.innerHTML = `
     <div class="reporte-encabezado">${encabezado}</div>
     <div class="reporte-stats">
@@ -1995,10 +2039,15 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
         <span class="stat-label">Ganancia<span class="dato-interno"> (interno)</span></span>
         <strong class="stat-valor">${formatearPesos(resumen.gananciaTotal)}</strong>
       </div>
+      <div class="stat-item">
+        <span class="stat-label">IVA recaudado</span>
+        <strong class="stat-valor">${formatearPesos(resumen.ivaRecaudado)}</strong>
+      </div>
     </div>
     <p class="reporte-detalle">Dinero recibido en ventas (efectivo/transferencia): <strong>${formatearPesos(resumen.dineroRecibidoVentas)}</strong></p>
     <p class="reporte-detalle">Abonos recibidos (pagos de ventas a crédito): <strong>${formatearPesos(resumen.abonosRecibidos)}</strong></p>
     ${notaAproximada ? `<p class="reporte-detalle">${notaAproximada}</p>` : ''}
+    ${notaIvaAproximada ? `<p class="reporte-detalle">${notaIvaAproximada}</p>` : ''}
     <p><strong>Desglose por método de pago:</strong></p>
     <ul>${filasMetodo || '<li class="empty-state">Sin ventas en este rango.</li>'}</ul>
   `;
