@@ -59,6 +59,15 @@ function validarCamposProducto({ nombre, precioCompra, precioDetal, precioMayor,
   return { exito: true };
 }
 
+// Advertencias, no bloqueos: pueden existir razones legítimas de negocio
+// para romper el orden "normal" de precios (liquidación, producto por
+// vencer, un producto sin diferencia real entre detal y mayor). Bloquear
+// dejaría a la cajera sin poder guardar un precio que sí quiso poner a
+// propósito; avisar le muestra el problema en lenguaje de negocio y la deja
+// decidir. Mismo criterio para las dos comparaciones nuevas de coherencia
+// (mayor vs. compra, detal vs. mayor) que para la ya existente de venta con
+// pérdida: no son errores de sistema, son señales para que la usuaria
+// revise si fue un error de digitación o si lo hizo a propósito.
 function generarAdvertencias({ precioCompra, precioDetal, precioMayor }) {
   const advertencias = [];
   if (precioDetal < precioCompra) {
@@ -66,6 +75,13 @@ function generarAdvertencias({ precioCompra, precioDetal, precioMayor }) {
   }
   if (precioMayor < precioCompra) {
     advertencias.push('El precio al por mayor es menor al precio de compra: este producto se vendería con pérdida al por mayor.');
+  } else if (precioMayor === precioCompra) {
+    advertencias.push('El precio al por mayor es igual al precio de compra: este producto no dejaría ninguna ganancia al venderse por mayor.');
+  }
+  if (precioDetal < precioMayor) {
+    advertencias.push('El precio al detal es menor al precio al por mayor: revisa si no se cambiaron los precios por error, porque normalmente quien compra al detal paga más por unidad que quien compra por mayor.');
+  } else if (precioDetal === precioMayor) {
+    advertencias.push('El precio al detal es igual al precio al por mayor: revisa si es intencional (por ejemplo, si este producto no maneja precio diferenciado por mayor).');
   }
   return advertencias;
 }
@@ -231,6 +247,76 @@ function desactivarProducto(id, usuario = null) {
   return { exito: true, producto };
 }
 
+// Reactivar un producto previamente desactivado. Nunca puede chocar con la
+// restricción UNIQUE de codigo_barras: buscarPorCodigoBarras() (usada por
+// crearProducto/actualizarProducto para bloquear duplicados) no filtra por
+// `activo`, así que mientras este producto siguió existiendo con `activo=0`
+// su código de barras nunca quedó "libre" para que otro producto lo tomara
+// — ningún otro producto pudo haberse creado ni editado con ese mismo
+// código mientras tanto. Reactivar solo cambia la bandera `activo`, no
+// toca `codigo_barras`, así que no hace falta repetir esa validación acá.
+function reactivarProducto(id, usuario = null) {
+  const actual = productosRepo.buscarPorId(id);
+  if (!actual) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
+  }
+
+  const producto = productosRepo.reactivar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.PRODUCTO_REACTIVADO,
+    entidad: 'producto',
+    entidadId: id,
+    detalle: `Producto "${actual.nombre}" (id ${id}) reactivado.`,
+  });
+
+  return { exito: true, producto };
+}
+
+// Borrado permanente: a diferencia de desactivarProducto, esto sí borra la
+// fila. Solo es seguro cuando el producto nunca se usó — si venta_items lo
+// referencia, borrarlo dejaría huérfanas esas filas y rompería el historial
+// de esa factura, el reporte de productos más vendidos y el cálculo de
+// ganancia histórica (todos hacen JOIN productos <- venta_items). El stock
+// en cero evita borrar de la base de datos mercancía que sigue existiendo
+// físicamente en la tienda sin dejar ningún rastro de qué producto era.
+function eliminarProducto(id, usuario = null) {
+  const actual = productosRepo.buscarPorId(id);
+  if (!actual) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el producto.' };
+  }
+
+  const ventasAsociadas = productosRepo.contarVentaItems(id);
+  const razones = [];
+  if (ventasAsociadas > 0) {
+    razones.push(`ya se vendió ${ventasAsociadas} ${ventasAsociadas === 1 ? 'vez' : 'veces'}`);
+  }
+  if (actual.stock_actual > 0) {
+    razones.push(`todavía tiene ${actual.stock_actual} ${actual.stock_actual === 1 ? 'unidad' : 'unidades'} en stock`);
+  }
+
+  if (razones.length > 0) {
+    return {
+      exito: false,
+      error: 'no_se_puede_eliminar',
+      mensaje: `No se puede eliminar "${actual.nombre}" porque ${razones.join(' y ')}. Si ya no lo vas a vender, desactívalo en su lugar: deja de aparecer en las ventas nuevas, pero conserva su historial.`,
+    };
+  }
+
+  productosRepo.eliminar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.PRODUCTO_ELIMINADO,
+    entidad: 'producto',
+    entidadId: id,
+    detalle: `Producto "${actual.nombre}" (id ${id}) eliminado de forma permanente.`,
+  });
+
+  return { exito: true };
+}
+
 // --- Nuevas funciones de Dominio para HU-03, HU-04 y HU-05 ---
 
 // HU-03: Actualizar stock por ingreso de productos
@@ -291,6 +377,8 @@ module.exports = {
   buscarPorCodigoBarras,
   actualizarProducto,
   desactivarProducto,
+  reactivarProducto,
+  eliminarProducto,
   // Nuevas exportaciones:
   ingresarStock,
   obtenerAlertasStock,

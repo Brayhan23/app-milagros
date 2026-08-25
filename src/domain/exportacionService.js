@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const reportesService = require('./reportesService');
 const ventasService = require('./ventasService');
 const configuracionRepo = require('../data/configuracionRepo');
+const { fechaColombiaISO } = require('./fechaColombia');
 
 const ETIQUETA_TIPO_CLIENTE = { detal: 'Detal', mayor: 'Mayor' };
 const ETIQUETA_METODO_PAGO = { efectivo: 'Efectivo', transferencia: 'Transferencia', credito: 'Crédito' };
@@ -129,7 +130,7 @@ async function construirExcel(datos) {
   let sumaTotal = 0;
   ventas.forEach((v) => {
     const fila = hoja.addRow([
-      v.creado_en.slice(0, 10),
+      fechaColombiaISO(v.creado_en),
       v.nombre_cliente || 'Sin cliente',
       ETIQUETA_TIPO_CLIENTE[v.tipo_cliente] || v.tipo_cliente,
       ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago,
@@ -305,7 +306,7 @@ function construirPdf(datos) {
     ventas.forEach((v) => {
       saltarPaginaSiHaceFalta();
       dibujarFila([
-        v.creado_en.slice(0, 10),
+        fechaColombiaISO(v.creado_en),
         v.nombre_cliente || 'Sin cliente',
         ETIQUETA_TIPO_CLIENTE[v.tipo_cliente] || v.tipo_cliente,
         ETIQUETA_METODO_PAGO[v.metodo_pago] || v.metodo_pago,

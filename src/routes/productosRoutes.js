@@ -10,6 +10,7 @@ const ESTADO_POR_ERROR = {
   cantidad_invalida: 400,
   codigo_duplicado: 409,
   no_encontrado: 404,
+  no_se_puede_eliminar: 409,
 };
 
 function responderError(res, resultado) {
@@ -60,6 +61,31 @@ router.delete('/productos/:id', (req, res) => {
   const resultado = productosService.desactivarProducto(id, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, producto: resultado.producto });
+});
+
+router.patch('/productos/:id/reactivar', (req, res) => {
+  const id = parsearId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ exito: false, mensaje: 'El id del producto debe ser un número entero.' });
+  }
+
+  const resultado = productosService.reactivarProducto(id, req.usuario);
+  if (!resultado.exito) return responderError(res, resultado);
+  return res.json({ exito: true, producto: resultado.producto });
+});
+
+// Borrado permanente (distinto del DELETE de arriba, que solo desactiva):
+// ruta propia para no cambiarle el significado a un endpoint que ya está en
+// uso por el frontend actual.
+router.delete('/productos/:id/permanente', (req, res) => {
+  const id = parsearId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ exito: false, mensaje: 'El id del producto debe ser un número entero.' });
+  }
+
+  const resultado = productosService.eliminarProducto(id, req.usuario);
+  if (!resultado.exito) return responderError(res, resultado);
+  return res.json({ exito: true });
 });
 
 

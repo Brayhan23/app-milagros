@@ -72,8 +72,13 @@ function obtenerDeudaCliente(clienteId) {
   const ventas = deudasRepo.ventasCreditoDeCliente(clienteId);
   const abonos = deudasRepo.abonosDeCliente(clienteId);
   const saldoTotal = ventas.reduce((suma, venta) => suma + venta.saldo, 0);
+  // Total de ventas del cliente (pagadas + a crédito), no solo las a
+  // crédito de arriba: es lo que decide si se puede ofrecer "Eliminar" en
+  // la ficha (clientesService.eliminarCliente exige cero ventas de
+  // cualquier tipo, no solo deuda saldada).
+  const ventasTotales = clientesRepo.contarVentas(clienteId);
 
-  return { exito: true, cliente, ventas, abonos, saldoTotal };
+  return { exito: true, cliente, ventas, abonos, saldoTotal, ventasTotales };
 }
 
 function listarClientesConDeuda() {

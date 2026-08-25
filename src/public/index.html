@@ -153,6 +153,13 @@
       <line x1="17" x2="22" y1="8" y2="13" />
       <line x1="22" x2="17" y1="8" y2="13" />
     </symbol>
+    <symbol id="icon-trash-2" viewBox="0 0 24 24">
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </symbol>
   </svg>
 
   <!-- Vista: Login -->
@@ -265,17 +272,16 @@
       <!-- Pestaña: Productos -->
       <div id="tab-productos" class="tab-panel">
 
-        <section class="card alert-card">
-          <h2><svg class="icon"><use href="#icon-alert-triangle"></use></svg> Productos por agotarse</h2>
-          <button id="btn-actualizar-alertas" type="button" class="btn btn-secondary">Refrescar alertas</button>
-          <div id="contenedor-alertas" class="alertas-grid">
-            <p class="empty-state">Cargando alertas...</p>
-          </div>
-        </section>
-
         <section class="card">
-          <h2><svg class="icon"><use href="#icon-tag"></use></svg> Agregar producto nuevo</h2>
-          <form id="form-producto" class="form-grid-2col">
+          <div class="card-header">
+            <h2><svg class="icon"><use href="#icon-tag"></use></svg> Productos</h2>
+            <button type="button" id="btn-mostrar-form-producto" class="btn btn-secondary">
+              <svg class="icon icon-sm"><use href="#icon-tag"></use></svg> Nuevo producto
+            </button>
+          </div>
+
+          <form id="form-producto" class="form-grid-2col hidden">
+            <input type="hidden" id="prod-id-editando" value="">
             <div class="form-group">
               <label for="prod-codigo">Código de barras</label>
               <input type="text" id="prod-codigo" placeholder="Ej: 7701234567890">
@@ -300,7 +306,7 @@
               <label for="prod-pmayor">Precio al por mayor ($)</label>
               <input type="number" id="prod-pmayor" placeholder="0" min="0" required>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="prod-stock-inicial-grupo">
               <label for="prod-stock-inicial">Stock inicial</label>
               <input type="number" id="prod-stock-inicial" placeholder="0" min="0" value="0">
             </div>
@@ -309,35 +315,26 @@
               <input type="number" id="prod-stock-minimo" placeholder="0" min="0" value="5">
             </div>
             <div class="form-actions span-2">
-              <button type="submit" class="btn btn-primary">Guardar producto</button>
+              <button type="submit" id="btn-guardar-producto" class="btn btn-primary">Guardar producto</button>
+              <button type="button" id="btn-cancelar-form-producto" class="btn btn-neutral">Cancelar</button>
             </div>
           </form>
           <div id="mensaje-producto" class="mensaje"></div>
-        </section>
 
-        <section class="card">
-          <h2><svg class="icon"><use href="#icon-package"></use></svg> Ingresar mercancía</h2>
-          <form id="form-stock" class="form-grid-3col">
-            <div class="form-group">
-              <label for="stock-producto-id">Número del producto</label>
-              <input type="number" id="stock-producto-id" placeholder="Ej: 1" required>
+          <div class="productos-toolbar">
+            <div class="form-group productos-buscar">
+              <label for="productos-buscar-input">
+                <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por nombre o código de barras
+              </label>
+              <input type="text" id="productos-buscar-input" placeholder="Ej: shampoo, 7701234…" autocomplete="off">
             </div>
-            <div class="form-group">
-              <label for="stock-cantidad">Cantidad que llegó</label>
-              <input type="number" id="stock-cantidad" min="1" placeholder="Ej: 10" required>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Sumar al stock</button>
-            </div>
-          </form>
-          <div id="mensaje-stock" class="mensaje"></div>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
-            <h2><svg class="icon"><use href="#icon-package"></use></svg> Inventario</h2>
-            <button id="btn-cargar-stock" type="button" class="btn btn-secondary">Actualizar lista</button>
+            <label for="productos-ver-inactivos" class="productos-ver-inactivos">
+              <input type="checkbox" id="productos-ver-inactivos"> Ver también los desactivados
+            </label>
           </div>
+
+          <div id="productos-alerta-stock" class="alerta-item hidden"></div>
+
           <div class="table-responsive">
             <table class="tabla-inventario">
               <thead>
@@ -351,11 +348,12 @@
                   <th>Stock Actual</th>
                   <th>Stock Mín.</th>
                   <th>Estado</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="tabla-body-stock">
                 <tr>
-                  <td colspan="9" class="empty-state">Cargando inventario...</td>
+                  <td colspan="10" class="empty-state">Cargando inventario...</td>
                 </tr>
               </tbody>
             </table>
@@ -564,11 +562,16 @@
 
           <div class="clientes-layout">
             <div class="clientes-lista-col">
-              <div class="form-group clientes-buscar">
-                <label for="clientes-buscar-input">
-                  <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por nombre o documento
+              <div class="clientes-toolbar">
+                <div class="form-group clientes-buscar">
+                  <label for="clientes-buscar-input">
+                    <svg class="icon icon-sm"><use href="#icon-search"></use></svg> Buscar por nombre o documento
+                  </label>
+                  <input type="text" id="clientes-buscar-input" placeholder="Ej: Juan, 123456789…" autocomplete="off">
+                </div>
+                <label for="clientes-ver-inactivos" class="clientes-ver-inactivos">
+                  <input type="checkbox" id="clientes-ver-inactivos"> Ver también los desactivados
                 </label>
-                <input type="text" id="clientes-buscar-input" placeholder="Ej: Juan, 123456789…" autocomplete="off">
               </div>
               <div id="clientes-lista" class="clientes-lista">
                 <p class="empty-state">Cargando clientes…</p>
@@ -668,15 +671,15 @@
               <button type="button" id="btn-historico" class="btn btn-secondary">Consultar</button>
             </div>
           </div>
-          <div id="mensaje-historico" class="mensaje"></div>
-          <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
-
           <div class="form-actions">
-            <button type="button" id="btn-exportar-excel" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-spreadsheet"></use></svg> Exportar Excel</button>
-            <button type="button" id="btn-exportar-pdf" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-down"></use></svg> Exportar PDF</button>
+            <span class="reporte-exportar-etiqueta">Exportar este rango:</span>
+            <button type="button" id="btn-exportar-excel" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-spreadsheet"></use></svg> Excel</button>
+            <button type="button" id="btn-exportar-pdf" class="btn btn-secondary"><svg class="icon icon-sm"><use href="#icon-file-down"></use></svg> PDF</button>
           </div>
           <p class="empty-state">Usa las mismas fechas Desde/Hasta de arriba. El archivo no incluye la ganancia del negocio.</p>
           <div id="mensaje-exportar" class="mensaje"></div>
+          <div id="mensaje-historico" class="mensaje"></div>
+          <div id="resumen-historico" class="empty-state">Elegí un rango y consultá.</div>
 
           <div class="card-header">
             <h2 class="subtitle">Ventas individuales del rango</h2>
@@ -714,6 +717,7 @@
             <table class="tabla-inventario">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Producto</th>
                   <th>Unidades vendidas</th>
                   <th>Ingreso generado</th>
@@ -721,7 +725,7 @@
               </thead>
               <tbody id="tabla-body-ranking">
                 <tr>
-                  <td colspan="3" class="empty-state">Sin datos todavía.</td>
+                  <td colspan="4" class="empty-state">Sin datos todavía.</td>
                 </tr>
               </tbody>
             </table>
@@ -744,15 +748,19 @@
               <label for="auditoria-hasta">Hasta</label>
               <input type="date" id="auditoria-hasta">
             </div>
+            <div class="form-group">
+              <label for="auditoria-accion">Tipo de acción</label>
+              <select id="auditoria-accion">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="auditoria-usuario">Usuario</label>
+              <input type="text" id="auditoria-usuario" placeholder="Ej: admin">
+            </div>
             <div class="form-actions">
               <button type="button" id="btn-auditoria" class="btn btn-secondary">Consultar</button>
             </div>
-          </div>
-          <div class="form-group">
-            <label for="auditoria-accion">Tipo de acción</label>
-            <select id="auditoria-accion">
-              <option value="">Todas</option>
-            </select>
           </div>
           <div id="mensaje-auditoria" class="mensaje"></div>
           <div class="table-responsive">

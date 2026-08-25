@@ -139,4 +139,76 @@ function desactivarCliente(id, usuario = null) {
   return { exito: true, cliente };
 }
 
-module.exports = { crearCliente, listarClientes, buscarClientePorId, actualizarCliente, desactivarCliente };
+// Reactivar un cliente previamente desactivado. Mismo patrón que
+// productosService.reactivarProducto, incluyendo el mismo caso borde con la
+// restricción UNIQUE de documento: reactivar solo cambia la bandera
+// `activo`, nunca toca `documento`, y mientras este cliente siguió
+// existiendo con `activo=0` su documento nunca quedó "libre" para que otro
+// cliente lo tomara — ningún otro pudo haberse creado ni editado con ese
+// mismo documento mientras tanto, así que no hace falta repetir esa
+// validación acá.
+function reactivarCliente(id, usuario = null) {
+  const actual = clientesRepo.buscarPorId(id);
+  if (!actual) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el cliente.' };
+  }
+
+  const cliente = clientesRepo.reactivar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CLIENTE_REACTIVADO,
+    entidad: 'cliente',
+    entidadId: id,
+    detalle: `Cliente "${actual.nombre}" (id ${id}) reactivado.`,
+  });
+
+  return { exito: true, cliente };
+}
+
+// Borrado permanente: a diferencia de desactivarCliente, esto sí borra la
+// fila. Solo es seguro cuando el cliente nunca tuvo una venta asociada.
+// Deuda pendiente y abonos registrados no hace falta comprobarlos aparte:
+// ambos SIEMPRE cuelgan de una venta a crédito de este cliente (una venta a
+// crédito ES la deuda, ver el comentario en schema.sql, y un abono siempre
+// referencia una venta), así que si el cliente no tiene ninguna venta
+// tampoco puede tener deuda ni abonos.
+function eliminarCliente(id, usuario = null) {
+  const actual = clientesRepo.buscarPorId(id);
+  if (!actual) {
+    return { exito: false, error: 'no_encontrado', mensaje: 'No se encontró el cliente.' };
+  }
+
+  const ventasAsociadas = clientesRepo.contarVentas(id);
+  if (ventasAsociadas > 0) {
+    return {
+      exito: false,
+      error: 'no_se_puede_eliminar',
+      mensaje: `No se puede eliminar a "${actual.nombre}" porque tiene ${ventasAsociadas} ${
+        ventasAsociadas === 1 ? 'factura asociada' : 'facturas asociadas'
+      } (incluye ventas pagadas y a crédito, con su deuda y sus abonos si los tiene). Si ya no es un cliente activo, desactívalo en su lugar: deja de aparecer para ventas nuevas, pero conserva su historial.`,
+    };
+  }
+
+  clientesRepo.eliminar(id);
+
+  auditoriaService.registrar({
+    usuario,
+    accion: ACCIONES.CLIENTE_ELIMINADO,
+    entidad: 'cliente',
+    entidadId: id,
+    detalle: `Cliente "${actual.nombre}" (id ${id}) eliminado de forma permanente.`,
+  });
+
+  return { exito: true };
+}
+
+module.exports = {
+  crearCliente,
+  listarClientes,
+  buscarClientePorId,
+  actualizarCliente,
+  desactivarCliente,
+  reactivarCliente,
+  eliminarCliente,
+};

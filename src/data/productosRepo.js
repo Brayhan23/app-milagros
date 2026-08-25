@@ -8,11 +8,19 @@ function buscarPorCodigoBarras(codigoBarras) {
   return db.prepare('SELECT * FROM productos WHERE codigo_barras = ?').get(codigoBarras);
 }
 
+// tiene_ventas (0/1): si el producto ya aparece en venta_items, para que el
+// frontend sepa cuándo puede ofrecer "Eliminar" (borrado permanente) sin
+// tener que preguntarle al backend fila por fila.
 function listar({ incluirInactivos = false } = {}) {
-  if (incluirInactivos) {
-    return db.prepare('SELECT * FROM productos ORDER BY nombre').all();
-  }
-  return db.prepare('SELECT * FROM productos WHERE activo = 1 ORDER BY nombre').all();
+  const filtroActivo = incluirInactivos ? '' : 'WHERE activo = 1';
+  return db
+    .prepare(
+      `SELECT *, EXISTS(SELECT 1 FROM venta_items WHERE producto_id = productos.id) AS tiene_ventas
+       FROM productos
+       ${filtroActivo}
+       ORDER BY nombre`
+    )
+    .all();
 }
 
 function crear({
@@ -50,6 +58,27 @@ function actualizar(id, { codigoBarras, nombre, descripcion, precioCompra, preci
 function desactivar(id) {
   db.prepare(`UPDATE productos SET activo = 0, actualizado_en = datetime('now') WHERE id = ?`).run(id);
   return buscarPorId(id);
+}
+
+// Reactivar solo cambia `activo`, nunca `codigo_barras`: la fila conserva el
+// mismo valor que ya tenía (único en la tabla) mientras estaba desactivada,
+// así que no hay forma de que este UPDATE choque con la restricción UNIQUE
+// de esa columna (ver el comentario en productosService.reactivarProducto).
+function reactivar(id) {
+  db.prepare(`UPDATE productos SET activo = 1, actualizado_en = datetime('now') WHERE id = ?`).run(id);
+  return buscarPorId(id);
+}
+
+// Borrado permanente (a diferencia de desactivar): solo lo llama
+// productosService.eliminarProducto después de confirmar que el producto
+// nunca se usó, así que acá no hace falta repetir esa validación.
+function contarVentaItems(id) {
+  const { cantidad } = db.prepare('SELECT COUNT(*) AS cantidad FROM venta_items WHERE producto_id = ?').get(id);
+  return cantidad;
+}
+
+function eliminar(id) {
+  db.prepare('DELETE FROM productos WHERE id = ?').run(id);
 }
 
 // --- Nuevas funciones para HU-03, HU-04 y HU-05 ---
@@ -94,6 +123,9 @@ module.exports = {
   crear,
   actualizar,
   desactivar,
+  reactivar,
+  contarVentaItems,
+  eliminar,
   // Nuevas exportaciones:
   actualizarStock,
   listarBajoStock,

@@ -55,15 +55,15 @@ function mostrarUsuarioEnHeader() {
 // Productos DOM
 const formProducto = document.getElementById('form-producto');
 const mensajeProducto = document.getElementById('mensaje-producto');
-
-// Stock DOM
-const formStock = document.getElementById('form-stock');
-const mensajeStock = document.getElementById('mensaje-stock');
+const inputProdIdEditando = document.getElementById('prod-id-editando');
+const grupoProdStockInicial = document.getElementById('prod-stock-inicial-grupo');
+const btnMostrarFormProducto = document.getElementById('btn-mostrar-form-producto');
+const btnCancelarFormProducto = document.getElementById('btn-cancelar-form-producto');
+const btnGuardarProducto = document.getElementById('btn-guardar-producto');
+const productosBuscarInput = document.getElementById('productos-buscar-input');
+const productosVerInactivosInput = document.getElementById('productos-ver-inactivos');
+const productosAlertaStock = document.getElementById('productos-alerta-stock');
 const tablaStockBody = document.getElementById('tabla-body-stock');
-const contenedorAlertas = document.getElementById('contenedor-alertas');
-
-const btnCargarStock = document.getElementById('btn-cargar-stock');
-const btnActualizarAlertas = document.getElementById('btn-actualizar-alertas');
 
 // --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -99,20 +99,41 @@ const NOMBRES_MES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
-// El backend guarda las fechas como "AAAA-MM-DD HH:MM:SS" (hora del
-// servidor, sin ajuste de zona horaria). Acá se parsean los componentes
-// directo del string, sin pasar por `new Date(string)`: ese constructor
-// interpreta este formato de manera distinta según el motor del navegador
-// (a veces como hora local, a veces como UTC), lo que podría correr la
-// fecha/hora mostrada sin que el dato real haya cambiado. Parseando a mano
-// se reformatea exactamente el mismo instante que ya se mostraba antes,
-// solo que legible.
+// El backend guarda las marcas de tiempo como "AAAA-MM-DD HH:MM:SS" en UTC
+// (datetime('now') de SQLite) — nunca en hora de Colombia. Acá se parsean
+// los componentes directo del string, sin pasar por `new Date(string)`: ese
+// constructor interpreta este formato de manera distinta según el motor del
+// navegador (a veces como hora local, a veces como UTC), lo que podría
+// correr la fecha/hora mostrada sin que el dato real haya cambiado.
+//
+// Cuando el string trae hora (no cuando es solo "AAAA-MM-DD", como las
+// fechas de reportes que reportesService.js ya entrega ajustadas a
+// Colombia), se le restan 5 horas antes de formatear — mismo desplazamiento
+// fijo (Colombia es UTC-5 todo el año) que reportesRepo.js/auditoriaRepo.js
+// ya aplican del lado del servidor para clasificar "a qué día calendario
+// pertenece" cada fila. Sin este ajuste, cualquier hora mostrada quedaba 5
+// horas adelantada de la hora real de Colombia (ej. una venta de las 7:00
+// p.m. se mostraba como si hubiera sido a las 12:00 a.m. del día
+// siguiente). El cálculo se hace en milisegundos UTC (Date.UTC + getUTC*),
+// nunca con la hora local del navegador, para que el resultado no dependa
+// de en qué huso horario esté configurado el equipo de la usuaria.
 function formatearFecha(fechaStr, { conHora = true } = {}) {
   if (!fechaStr) return '';
   const match = String(fechaStr).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
   if (!match) return fechaStr;
 
-  const [, anio, mes, dia, hora, minuto] = match;
+  let [, anio, mes, dia, hora, minuto] = match;
+
+  if (hora !== undefined) {
+    const instanteUtc = Date.UTC(Number(anio), Number(mes) - 1, Number(dia), Number(hora), Number(minuto));
+    const instanteColombia = new Date(instanteUtc - 5 * 60 * 60 * 1000);
+    anio = String(instanteColombia.getUTCFullYear());
+    mes = String(instanteColombia.getUTCMonth() + 1).padStart(2, '0');
+    dia = String(instanteColombia.getUTCDate()).padStart(2, '0');
+    hora = String(instanteColombia.getUTCHours()).padStart(2, '0');
+    minuto = String(instanteColombia.getUTCMinutes()).padStart(2, '0');
+  }
+
   const fechaLegible = `${Number(dia)} de ${NOMBRES_MES[Number(mes) - 1]}, ${anio}`;
   if (!conHora || hora === undefined) return fechaLegible;
 
@@ -172,8 +193,7 @@ function verificarSesion() {
 }
 
 function cargarPanel() {
-  cargarStockTiempoReal();
-  cargarAlertasStock();
+  cargarProductosPantalla();
   cargarConfiguracion();
 }
 
@@ -373,136 +393,136 @@ btnLogout.addEventListener('click', async () => {
 });
 
 
-// --- REGISTRAR PRODUCTO ---
-formProducto.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  mostrarMensaje(mensajeProducto, '', null);
+// --- PRODUCTOS ---
+//
+// Mismo patrón que clientes: búsqueda en memoria sobre productosCache
+// (cargado una sola vez con GET /productos), formulario único para crear y
+// editar, acciones (editar/desactivar/reactivar/ingresar stock) en la
+// propia fila en vez de formularios sueltos donde había que volver a
+// escribir el número del producto. La alerta de stock bajo se calcula del
+// mismo productosCache ya cargado — no es una sección aparte con su propio
+// origen de datos, es un resumen de la misma tabla que está debajo.
 
-  const payload = {
-    codigoBarras: document.getElementById('prod-codigo').value.trim() || null,
-    nombre: document.getElementById('prod-nombre').value.trim(),
-    descripcion: document.getElementById('prod-descripcion').value.trim() || null,
-    precioCompra: Number(document.getElementById('prod-pcompra').value),
-    precioDetal: Number(document.getElementById('prod-pdetal').value),
-    precioMayor: Number(document.getElementById('prod-pmayor').value),
-    stockActual: Number(document.getElementById('prod-stock-inicial').value) || 0,
-    stockMinimo: Number(document.getElementById('prod-stock-minimo').value) || 0,
-  };
+let productosCache = [];
+let productoIdStockAbierto = null; // id del producto con el panel de "+ Stock" abierto
 
+async function cargarProductosPantalla() {
+  tablaStockBody.innerHTML = '<tr><td colspan="10" class="empty-state">Cargando inventario...</td></tr>';
   try {
-    const res = await fetch(`${API_URL}/productos`, {
-      method: 'POST',
-      headers: obtenerHeaders(),
-      body: JSON.stringify(payload)
-    });
-
+    const query = productosVerInactivosInput.checked ? '?incluirInactivos=true' : '';
+    const res = await fetch(`${API_URL}/productos${query}`, { headers: obtenerHeaders() });
     const data = await res.json();
 
     if (!res.ok || !data.exito) {
-      mostrarMensaje(mensajeProducto, data.mensaje || 'Error al registrar el producto.', 'error');
+      tablaStockBody.innerHTML = '<tr><td colspan="10" class="empty-state">No se pudo cargar el inventario.</td></tr>';
       return;
     }
 
-    let msg = `Producto "${data.producto.nombre}" registrado exitosamente.`;
-    if (data.advertencias && data.advertencias.length > 0) {
-      msg += ` (Advertencia: ${data.advertencias.join(' ')})`;
-    }
-
-    mostrarMensaje(mensajeProducto, msg, 'exito');
-    formProducto.reset();
-
-    // Refrescar tablas
-    cargarPanel();
-
+    productosCache = data.productos;
+    productoIdStockAbierto = null;
+    filtrarProductosPantalla();
   } catch (err) {
-    mostrarMensaje(mensajeProducto, 'Error de conexión al guardar el producto.', 'error');
-  }
-});
-
-
-// --- REGISTRAR ENTRADA DE STOCK ---
-formStock.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  mostrarMensaje(mensajeStock, '', null);
-
-  const id = document.getElementById('stock-producto-id').value;
-  const cantidad = Number(document.getElementById('stock-cantidad').value);
-
-  try {
-    const res = await fetch(`${API_URL}/productos/${id}/stock`, {
-      method: 'PATCH',
-      headers: obtenerHeaders(),
-      body: JSON.stringify({ cantidad })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data.exito) {
-      mostrarMensaje(mensajeStock, data.mensaje || 'Error al actualizar el stock.', 'error');
-      return;
-    }
-
-    mostrarMensaje(
-      mensajeStock,
-      `Stock actualizado. "${data.producto.nombre}" ahora cuenta con ${data.producto.stock_actual} unidades.`,
-      'exito'
-    );
-    formStock.reset();
-
-    cargarPanel();
-
-  } catch (err) {
-    mostrarMensaje(mensajeStock, 'Error de conexión al sumar el stock.', 'error');
-  }
-});
-
-
-// --- ALERTAS DE STOCK BAJO ---
-btnActualizarAlertas.addEventListener('click', cargarAlertasStock);
-
-async function cargarAlertasStock() {
-  try {
-    const res = await fetch(`${API_URL}/productos/alertas/stock-bajo`, {
-      headers: obtenerHeaders()
-    });
-    const data = await res.json();
-
-    if (!data.exito || !data.productos || data.productos.length === 0) {
-      contenedorAlertas.innerHTML = `<p class="empty-state">No hay alertas de stock bajo actualmente.</p>`;
-      return;
-    }
-
-    contenedorAlertas.innerHTML = data.productos.map(p => `
-      <div class="alerta-item">
-        ${icono('alert-triangle', 'icon-sm')}
-        <span><strong>${escaparHtml(p.nombre)}</strong> (N.° ${p.id}): quedan ${p.stock_actual} und. (mínimo: ${p.stock_minimo})</span>
-      </div>
-    `).join('');
-  } catch (err) {
-    contenedorAlertas.innerHTML = `<p class="empty-state">Error al obtener las alertas.</p>`;
+    tablaStockBody.innerHTML = '<tr><td colspan="10" class="empty-state">Error de conexión al cargar el inventario.</td></tr>';
   }
 }
 
+function filtrarProductosPantalla() {
+  const termino = productosBuscarInput.value.trim().toLowerCase();
+  const filtrados = termino
+    ? productosCache.filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(termino) ||
+          (p.codigo_barras && p.codigo_barras.toLowerCase().includes(termino))
+      )
+    : productosCache;
+  renderizarAlertaStockBajo();
+  renderizarTablaProductos(filtrados);
+}
+productosBuscarInput.addEventListener('input', filtrarProductosPantalla);
+productosVerInactivosInput.addEventListener('change', cargarProductosPantalla);
 
-// --- CONSULTA DE STOCK EN TIEMPO REAL ---
-btnCargarStock.addEventListener('click', cargarStockTiempoReal);
+// Resumen de stock bajo calculado sobre productosCache (siempre los
+// productos activos, sin importar el filtro de "ver desactivados" ni el
+// texto de búsqueda) — es la misma tabla de abajo, no otro origen de datos.
+function renderizarAlertaStockBajo() {
+  const bajoStock = productosCache.filter((p) => p.activo !== 0 && p.stock_actual <= p.stock_minimo);
+  if (bajoStock.length === 0) {
+    productosAlertaStock.classList.add('hidden');
+    return;
+  }
+  const nombres = bajoStock
+    .slice(0, 3)
+    .map((p) => escaparHtml(p.nombre))
+    .join(', ');
+  const resto = bajoStock.length > 3 ? ` y ${bajoStock.length - 3} más` : '';
+  productosAlertaStock.classList.remove('hidden');
+  productosAlertaStock.innerHTML = `
+    ${icono('alert-triangle', 'icon-sm')}
+    <span>${bajoStock.length} producto${bajoStock.length === 1 ? '' : 's'} con poco stock: ${nombres}${resto}.</span>
+  `;
+}
 
-async function cargarStockTiempoReal() {
-  try {
-    const res = await fetch(`${API_URL}/productos`, {
-      headers: obtenerHeaders()
-    });
-    const data = await res.json();
+function filaStockInline(item) {
+  return `
+    <tr>
+      <td colspan="10">
+        <div class="abono-inline">
+          <p>Ingresar mercancía de "<strong>${escaparHtml(item.nombre)}</strong>" — stock actual: <strong>${item.stock_actual}</strong> unidad(es)</p>
+          <form id="form-stock-fila" class="form-grid-3col" data-producto-id="${item.id}">
+            <div class="form-group">
+              <label for="stock-fila-cantidad">Cantidad que llegó</label>
+              <input type="number" id="stock-fila-cantidad" min="1" placeholder="Ej: 10" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Sumar al stock</button>
+              <button type="button" id="btn-cancelar-stock-fila" class="btn btn-neutral btn-sm">Cancelar</button>
+            </div>
+          </form>
+          <div id="mensaje-stock-fila" class="mensaje"></div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
 
-    if (!data.exito || !data.productos || data.productos.length === 0) {
-      tablaStockBody.innerHTML = `<tr><td colspan="9" class="empty-state">No hay productos registrados en la base de datos.</td></tr>`;
-      return;
-    }
+function renderizarTablaProductos(lista) {
+  if (lista.length === 0) {
+    tablaStockBody.innerHTML = `<tr><td colspan="10" class="empty-state">${
+      productosCache.length === 0 ? 'No hay productos registrados.' : 'No se encontraron productos.'
+    }</td></tr>`;
+    return;
+  }
 
-    tablaStockBody.innerHTML = data.productos.map(item => {
-      const bajoStock = item.stock_actual <= item.stock_minimo;
-      return `
-        <tr>
+  tablaStockBody.innerHTML = lista
+    .map((item) => {
+      const inactivo = item.activo === 0;
+      const bajoStock = !inactivo && item.stock_actual <= item.stock_minimo;
+      const estadoBadge = inactivo
+        ? '<span class="badge badge-neutro">Inactivo</span>'
+        : `<span class="badge ${bajoStock ? 'badge-low' : 'badge-ok'}">${bajoStock ? 'Stock bajo' : 'OK'}</span>`;
+
+      // "Eliminar" (borrado permanente) solo se ofrece cuando el producto
+      // nunca se usó: sin ventas asociadas y sin stock existente (mismas
+      // condiciones que valida productosService.eliminarProducto en el
+      // servidor). El botón es solo un atajo de UI — el servidor vuelve a
+      // validar antes de borrar, por si el estado cambió entre que se
+      // cargó la tabla y que se hizo clic.
+      const puedeEliminar = !item.tiene_ventas && item.stock_actual === 0;
+      const botonEliminar = puedeEliminar
+        ? `<button type="button" class="btn btn-danger btn-sm btn-eliminar-producto" data-id="${item.id}" title="Eliminar producto de forma permanente">${icono('trash-2', 'icon-sm')} Eliminar</button>`
+        : '';
+
+      const acciones = inactivo
+        ? `<button type="button" class="btn btn-secondary btn-sm btn-reactivar-producto" data-id="${item.id}">${icono('circle-check', 'icon-sm')} Reactivar</button>${botonEliminar}`
+        : `
+          <button type="button" class="btn btn-secondary btn-sm btn-stock-producto" data-id="${item.id}" title="Ingresar mercancía">${icono('package', 'icon-sm')} Stock</button>
+          <button type="button" class="btn btn-secondary btn-sm btn-editar-producto" data-id="${item.id}" title="Editar producto">${icono('pencil', 'icon-sm')} Editar</button>
+          <button type="button" class="btn btn-danger btn-sm btn-desactivar-producto" data-id="${item.id}" title="Desactivar producto">${icono('user-x', 'icon-sm')} Desactivar</button>
+          ${botonEliminar}
+        `;
+
+      const filaProducto = `
+        <tr class="${inactivo ? 'fila-inactiva' : bajoStock ? 'fila-alerta' : ''}">
           <td><strong>${item.id}</strong></td>
           <td>${escaparHtml(item.codigo_barras) || '—'}</td>
           <td><strong>${escaparHtml(item.nombre)}</strong></td>
@@ -511,18 +531,240 @@ async function cargarStockTiempoReal() {
           <td>${formatearPesos(item.precio_mayor)}</td>
           <td>${item.stock_actual}</td>
           <td>${item.stock_minimo}</td>
-          <td>
-            <span class="badge ${bajoStock ? 'badge-low' : 'badge-ok'}">
-              ${bajoStock ? 'Stock bajo' : 'OK'}
-            </span>
-          </td>
+          <td>${estadoBadge}</td>
+          <td class="fila-acciones">${acciones}</td>
         </tr>
       `;
-    }).join('');
+      return productoIdStockAbierto === item.id ? filaProducto + filaStockInline(item) : filaProducto;
+    })
+    .join('');
+}
+
+// Delegación de eventos: la tabla se regenera por completo con innerHTML en
+// cada consulta o filtro, así que un solo listener por tipo de evento cubre
+// todos los botones y el formulario inline de stock, presentes o futuros.
+tablaStockBody.addEventListener('click', (e) => {
+  const btnStock = e.target.closest('.btn-stock-producto');
+  if (btnStock) {
+    productoIdStockAbierto = Number(btnStock.dataset.id);
+    filtrarProductosPantalla();
+    return;
+  }
+
+  if (e.target.closest('#btn-cancelar-stock-fila')) {
+    productoIdStockAbierto = null;
+    filtrarProductosPantalla();
+    return;
+  }
+
+  const btnEditar = e.target.closest('.btn-editar-producto');
+  if (btnEditar) {
+    abrirFormProducto(productosCache.find((p) => p.id === Number(btnEditar.dataset.id)));
+    return;
+  }
+
+  const btnDesactivar = e.target.closest('.btn-desactivar-producto');
+  if (btnDesactivar) {
+    desactivarProductoPorId(Number(btnDesactivar.dataset.id));
+    return;
+  }
+
+  const btnReactivar = e.target.closest('.btn-reactivar-producto');
+  if (btnReactivar) {
+    reactivarProductoPorId(Number(btnReactivar.dataset.id));
+    return;
+  }
+
+  const btnEliminar = e.target.closest('.btn-eliminar-producto');
+  if (btnEliminar) {
+    eliminarProductoPorId(Number(btnEliminar.dataset.id));
+  }
+});
+
+tablaStockBody.addEventListener('submit', async (e) => {
+  if (e.target.id !== 'form-stock-fila') return;
+  e.preventDefault();
+
+  const form = e.target;
+  const id = Number(form.dataset.productoId);
+  const cantidad = Number(document.getElementById('stock-fila-cantidad').value);
+  const mensajeStockFila = document.getElementById('mensaje-stock-fila');
+  mostrarMensaje(mensajeStockFila, '', null);
+
+  try {
+    const res = await fetch(`${API_URL}/productos/${id}/stock`, {
+      method: 'PATCH',
+      headers: obtenerHeaders(),
+      body: JSON.stringify({ cantidad }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeStockFila, data.mensaje || 'No se pudo actualizar el stock.', 'error');
+      return;
+    }
+
+    productoIdStockAbierto = null;
+    mostrarMensaje(
+      mensajeProducto,
+      `Stock actualizado. "${data.producto.nombre}" ahora cuenta con ${data.producto.stock_actual} unidades.`,
+      'exito'
+    );
+    cargarProductosPantalla();
   } catch (err) {
-    tablaStockBody.innerHTML = `<tr><td colspan="9" class="empty-state">Error de conexión al cargar el inventario.</td></tr>`;
+    mostrarMensaje(mensajeStockFila, 'Error de conexión al sumar el stock.', 'error');
+  }
+});
+
+async function desactivarProductoPorId(id) {
+  const producto = productosCache.find((p) => p.id === id);
+  if (!producto) return;
+
+  const confirmado = window.confirm(
+    `¿Desactivar "${producto.nombre}"? El producto dejará de aparecer en las ventas, pero se conserva su historial.`
+  );
+  if (!confirmado) return;
+
+  try {
+    const res = await fetch(`${API_URL}/productos/${id}`, { method: 'DELETE', headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeProducto, data.mensaje || 'No se pudo desactivar el producto.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeProducto, `Producto "${producto.nombre}" desactivado.`, 'exito');
+    cargarProductosPantalla();
+  } catch (err) {
+    mostrarMensaje(mensajeProducto, 'Error de conexión al desactivar el producto.', 'error');
   }
 }
+
+async function reactivarProductoPorId(id) {
+  const producto = productosCache.find((p) => p.id === id);
+  if (!producto) return;
+
+  try {
+    const res = await fetch(`${API_URL}/productos/${id}/reactivar`, { method: 'PATCH', headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeProducto, data.mensaje || 'No se pudo reactivar el producto.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeProducto, `Producto "${producto.nombre}" reactivado.`, 'exito');
+    cargarProductosPantalla();
+  } catch (err) {
+    mostrarMensaje(mensajeProducto, 'Error de conexión al reactivar el producto.', 'error');
+  }
+}
+
+async function eliminarProductoPorId(id) {
+  const producto = productosCache.find((p) => p.id === id);
+  if (!producto) return;
+
+  const confirmado = window.confirm(
+    `¿Eliminar "${producto.nombre}" de forma permanente? Esta acción no se puede deshacer.`
+  );
+  if (!confirmado) return;
+
+  try {
+    const res = await fetch(`${API_URL}/productos/${id}/permanente`, { method: 'DELETE', headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeProducto, data.mensaje || 'No se pudo eliminar el producto.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeProducto, `Producto "${producto.nombre}" eliminado.`, 'exito');
+    cargarProductosPantalla();
+  } catch (err) {
+    mostrarMensaje(mensajeProducto, 'Error de conexión al eliminar el producto.', 'error');
+  }
+}
+
+// --- Registrar / editar producto (mismo formulario para ambos casos) ---
+
+function abrirFormProducto(producto = null) {
+  formProducto.reset();
+  if (producto) {
+    inputProdIdEditando.value = producto.id;
+    document.getElementById('prod-codigo').value = producto.codigo_barras || '';
+    document.getElementById('prod-nombre').value = producto.nombre || '';
+    document.getElementById('prod-descripcion').value = producto.descripcion || '';
+    document.getElementById('prod-pcompra').value = producto.precio_compra;
+    document.getElementById('prod-pdetal').value = producto.precio_detal;
+    document.getElementById('prod-pmayor').value = producto.precio_mayor;
+    document.getElementById('prod-stock-minimo').value = producto.stock_minimo;
+    grupoProdStockInicial.classList.add('hidden');
+    btnGuardarProducto.textContent = 'Guardar cambios';
+  } else {
+    inputProdIdEditando.value = '';
+    grupoProdStockInicial.classList.remove('hidden');
+    btnGuardarProducto.textContent = 'Guardar producto';
+  }
+  mostrarMensaje(mensajeProducto, '', null);
+  formProducto.classList.remove('hidden');
+  formProducto.scrollIntoView({ block: 'nearest' });
+  document.getElementById('prod-nombre').focus();
+}
+
+function cerrarFormProducto() {
+  formProducto.classList.add('hidden');
+  formProducto.reset();
+  inputProdIdEditando.value = '';
+  grupoProdStockInicial.classList.remove('hidden');
+  mostrarMensaje(mensajeProducto, '', null);
+}
+
+btnMostrarFormProducto.addEventListener('click', () => abrirFormProducto(null));
+btnCancelarFormProducto.addEventListener('click', cerrarFormProducto);
+
+formProducto.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mostrarMensaje(mensajeProducto, '', null);
+
+  const idEditando = inputProdIdEditando.value;
+  const payload = {
+    codigoBarras: document.getElementById('prod-codigo').value.trim() || null,
+    nombre: document.getElementById('prod-nombre').value.trim(),
+    descripcion: document.getElementById('prod-descripcion').value.trim() || null,
+    precioCompra: Number(document.getElementById('prod-pcompra').value),
+    precioDetal: Number(document.getElementById('prod-pdetal').value),
+    precioMayor: Number(document.getElementById('prod-pmayor').value),
+    stockMinimo: Number(document.getElementById('prod-stock-minimo').value) || 0,
+  };
+  if (!idEditando) {
+    payload.stockActual = Number(document.getElementById('prod-stock-inicial').value) || 0;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/productos${idEditando ? `/${idEditando}` : ''}`, {
+      method: idEditando ? 'PUT' : 'POST',
+      headers: obtenerHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeProducto, data.mensaje || 'No se pudo guardar el producto.', 'error');
+      return;
+    }
+
+    let msg = idEditando ? `Producto "${data.producto.nombre}" actualizado.` : `Producto "${data.producto.nombre}" registrado.`;
+    if (data.advertencias && data.advertencias.length > 0) {
+      msg += ` (Advertencia: ${data.advertencias.join(' ')})`;
+    }
+    mostrarMensaje(mensajeProducto, msg, 'exito');
+    cerrarFormProducto();
+    cargarProductosPantalla();
+  } catch (err) {
+    mostrarMensaje(mensajeProducto, 'Error de conexión al guardar el producto.', 'error');
+  }
+});
 
 // --- VENTAS Y FACTURACIÓN ---
 
@@ -931,8 +1173,7 @@ btnGenerarFactura.addEventListener('click', async () => {
     actualizarVisibilidadCliente();
     renderizarCarrito();
     cargarProductosParaVenta();
-    cargarStockTiempoReal();
-    cargarAlertasStock();
+    cargarProductosPantalla();
   } catch (err) {
     mostrarMensaje(mensajeVenta, 'Error de conexión al confirmar la venta.', 'error');
   }
@@ -1044,6 +1285,7 @@ const btnMostrarFormCliente = document.getElementById('btn-mostrar-form-cliente'
 const btnCancelarFormCliente = document.getElementById('btn-cancelar-form-cliente');
 const btnGuardarCliente = document.getElementById('btn-guardar-cliente');
 const clientesBuscarInput = document.getElementById('clientes-buscar-input');
+const clientesVerInactivosInput = document.getElementById('clientes-ver-inactivos');
 const clientesListaEl = document.getElementById('clientes-lista');
 const clienteFichaEl = document.getElementById('cliente-ficha');
 
@@ -1082,8 +1324,9 @@ function combinarClientesYDeudas(clientes, deudores) {
 async function cargarClientesPantalla() {
   clientesListaEl.innerHTML = '<p class="empty-state">Cargando clientes…</p>';
   try {
+    const query = clientesVerInactivosInput.checked ? '?incluirInactivos=true' : '';
     const [resClientes, resDeudas] = await Promise.all([
-      fetch(`${API_URL}/clientes`, { headers: obtenerHeaders() }),
+      fetch(`${API_URL}/clientes${query}`, { headers: obtenerHeaders() }),
       fetch(`${API_URL}/clientes/deudas`, { headers: obtenerHeaders() }),
     ]);
     const dataClientes = await resClientes.json();
@@ -1122,6 +1365,7 @@ function filtrarClientes() {
   renderizarListaClientes(filtrados);
 }
 clientesBuscarInput.addEventListener('input', filtrarClientes);
+clientesVerInactivosInput.addEventListener('change', cargarClientesPantalla);
 
 function renderizarListaClientes(lista) {
   if (lista.length === 0) {
@@ -1131,20 +1375,22 @@ function renderizarListaClientes(lista) {
 
   clientesListaEl.innerHTML = lista
     .map((c) => {
-      const saldoTexto =
-        c.saldo_total > 0
+      const inactivo = c.activo === 0;
+      const saldoTexto = inactivo
+        ? '<span class="badge badge-neutro">Inactivo</span>'
+        : c.saldo_total > 0
           ? `<strong>${formatearPesos(c.saldo_total)}</strong>`
           : `<span class="badge badge-ok">${icono('circle-check', 'icon-sm')} Al día</span>`;
 
       return `
-        <button type="button" class="cliente-fila${c.en_mora ? ' fila-mora' : ''}${c.id === clienteSeleccionadoId ? ' seleccionado' : ''}" data-id="${c.id}">
+        <button type="button" class="cliente-fila${inactivo ? ' inactivo' : ''}${c.en_mora ? ' fila-mora' : ''}${c.id === clienteSeleccionadoId ? ' seleccionado' : ''}" data-id="${c.id}">
           <span class="cliente-fila-nombre">
             <strong>${escaparHtml(c.nombre)}</strong>
             <span>${c.documento ? escaparHtml(c.documento) : 'Sin documento'}${c.es_mayorista ? ' · Mayorista' : ''}</span>
           </span>
           <span class="cliente-fila-saldo">
             ${saldoTexto}
-            ${c.en_mora ? `<span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} Mora</span>` : ''}
+            ${!inactivo && c.en_mora ? `<span class="badge badge-low">${icono('alert-triangle', 'icon-sm')} Mora</span>` : ''}
           </span>
         </button>
       `;
@@ -1208,7 +1454,8 @@ function filaAbonoInline(venta) {
 
 function renderizarFichaCliente() {
   if (!fichaClienteActual) return;
-  const { cliente, ventas, abonos, saldoTotal } = fichaClienteActual;
+  const { cliente, ventas, abonos, saldoTotal, ventasTotales } = fichaClienteActual;
+  const inactivo = cliente.activo === 0;
 
   const datos = [
     cliente.documento ? `Documento: ${escaparHtml(cliente.documento)}` : null,
@@ -1251,16 +1498,30 @@ function renderizarFichaCliente() {
     ? abonos.map((a) => `<li>Factura N.° ${a.venta_id}: ${formatearPesos(a.monto)} (${formatearFecha(a.creado_en)})</li>`).join('')
     : '<li class="empty-state">Sin abonos registrados.</li>';
 
+  // "Eliminar" (borrado permanente) solo se ofrece cuando el cliente nunca
+  // tuvo una venta asociada — mismas condiciones que valida
+  // clientesService.eliminarCliente en el servidor. El botón es solo un
+  // atajo de UI, el servidor vuelve a validar antes de borrar.
+  const puedeEliminar = ventasTotales === 0;
+  const botonEliminar = puedeEliminar
+    ? `<button type="button" id="btn-eliminar-cliente" class="btn btn-danger btn-sm">${icono('trash-2', 'icon-sm')} Eliminar</button>`
+    : '';
+  const acciones = inactivo
+    ? `<button type="button" id="btn-reactivar-cliente" class="btn btn-secondary btn-sm">${icono('circle-check', 'icon-sm')} Reactivar</button>${botonEliminar}`
+    : `
+      <button type="button" id="btn-editar-cliente" class="btn btn-secondary btn-sm">${icono('pencil', 'icon-sm')} Editar</button>
+      <button type="button" id="btn-desactivar-cliente" class="btn btn-danger btn-sm">${icono('user-x', 'icon-sm')} Desactivar</button>
+      ${botonEliminar}
+    `;
+
   clienteFichaEl.innerHTML = `
     <div class="cliente-ficha-header">
       <h3>
         ${escaparHtml(cliente.nombre)}
         ${cliente.es_mayorista ? '<span class="badge badge-neutro">Mayorista</span>' : ''}
+        ${inactivo ? '<span class="badge badge-neutro">Inactivo</span>' : ''}
       </h3>
-      <div class="cliente-ficha-acciones">
-        <button type="button" id="btn-editar-cliente" class="btn btn-secondary btn-sm">${icono('pencil', 'icon-sm')} Editar</button>
-        <button type="button" id="btn-desactivar-cliente" class="btn btn-danger btn-sm">${icono('user-x', 'icon-sm')} Desactivar</button>
-      </div>
+      <div class="cliente-ficha-acciones">${acciones}</div>
     </div>
     <p class="cliente-ficha-datos">${datos.length ? datos.join(' · ') : 'Sin datos de contacto registrados.'}</p>
     <p class="cliente-ficha-saldo">Deuda total: ${saldoTexto}</p>
@@ -1367,6 +1628,16 @@ clienteFichaEl.addEventListener('click', (e) => {
 
   if (e.target.closest('#btn-desactivar-cliente')) {
     desactivarClienteActual();
+    return;
+  }
+
+  if (e.target.closest('#btn-reactivar-cliente')) {
+    reactivarClienteActual();
+    return;
+  }
+
+  if (e.target.closest('#btn-eliminar-cliente')) {
+    eliminarClienteActual();
   }
 });
 
@@ -1543,6 +1814,59 @@ async function desactivarClienteActual() {
   }
 }
 
+async function reactivarClienteActual() {
+  const cliente = fichaClienteActual && fichaClienteActual.cliente;
+  if (!cliente) return;
+
+  try {
+    const res = await fetch(`${API_URL}/clientes/${cliente.id}/reactivar`, { method: 'PATCH', headers: obtenerHeaders() });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeCliente, data.mensaje || 'No se pudo reactivar el cliente.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeCliente, `Cliente "${cliente.nombre}" reactivado.`, 'exito');
+    clienteSeleccionadoId = cliente.id;
+    cargarClientesPantalla();
+    cargarClientesParaVenta();
+  } catch (err) {
+    mostrarMensaje(mensajeCliente, 'Error de conexión al reactivar el cliente.', 'error');
+  }
+}
+
+async function eliminarClienteActual() {
+  const cliente = fichaClienteActual && fichaClienteActual.cliente;
+  if (!cliente) return;
+
+  const confirmado = window.confirm(
+    `¿Eliminar a "${cliente.nombre}" de forma permanente? Esta acción no se puede deshacer.`
+  );
+  if (!confirmado) return;
+
+  try {
+    const res = await fetch(`${API_URL}/clientes/${cliente.id}/permanente`, {
+      method: 'DELETE',
+      headers: obtenerHeaders(),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.exito) {
+      mostrarMensaje(mensajeCliente, data.mensaje || 'No se pudo eliminar el cliente.', 'error');
+      return;
+    }
+
+    mostrarMensaje(mensajeCliente, `Cliente "${cliente.nombre}" eliminado.`, 'exito');
+    clienteSeleccionadoId = null;
+    fichaClienteActual = null;
+    cargarClientesPantalla();
+    cargarClientesParaVenta();
+  } catch (err) {
+    mostrarMensaje(mensajeCliente, 'Error de conexión al eliminar el cliente.', 'error');
+  }
+}
+
 // --- DATOS DE LA EMPRESA ---
 
 const formConfiguracion = document.getElementById('form-configuracion');
@@ -1631,7 +1955,11 @@ formConfiguracion.addEventListener('submit', async (e) => {
 
 // Mismo resumen (ventas, facturado, recibido, ganancia, desglose por
 // método) para "hoy" y para un rango: la única diferencia es qué rango de
-// fechas se consultó, así que comparten este único renderizador.
+// fechas se consultó, así que comparten este único renderizador. Los
+// totales van en una cuadrícula de cifras grandes (jerarquía clara de un
+// vistazo); el detalle fino (recibido en ventas vs. abonos, desglose por
+// método) queda como texto más chico debajo, para no competir con los
+// números principales.
 function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
   const filasMetodo = resumen.porMetodoPago
     .map(
@@ -1644,18 +1972,33 @@ function renderizarResumenReporte(contenedor, resumen, encabezado = '') {
     )
     .join('');
 
+  const notaAproximada = resumen.gananciaAproximada
+    ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
+    : '';
+
   contenedor.innerHTML = `
-    ${encabezado}
-    <p>Ventas: <strong>${resumen.cantidadVentas}</strong></p>
-    <p>Total facturado: <strong>${formatearPesos(resumen.totalFacturado)}</strong></p>
-    <p>Dinero recibido en ventas (efectivo/transferencia): <strong>${formatearPesos(resumen.dineroRecibidoVentas)}</strong></p>
-    <p>Abonos recibidos (pagos de ventas a crédito): <strong>${formatearPesos(resumen.abonosRecibidos)}</strong></p>
-    <p>Dinero total recibido en caja: <span class="badge badge-ok">${formatearPesos(resumen.dineroRecibidoTotal)}</span></p>
-    <p>Ganancia: <strong>${formatearPesos(resumen.gananciaTotal)}</strong>${
-    resumen.gananciaAproximada
-      ? ' <em>(incluye ventas registradas antes de guardar el costo histórico; para esas se usó el precio de compra actual del producto como aproximación)</em>'
-      : ''
-  }</p>
+    <div class="reporte-encabezado">${encabezado}</div>
+    <div class="reporte-stats">
+      <div class="stat-item">
+        <span class="stat-label">Ventas</span>
+        <strong class="stat-valor">${resumen.cantidadVentas}</strong>
+      </div>
+      <div class="stat-item destacado">
+        <span class="stat-label">Total facturado</span>
+        <strong class="stat-valor">${formatearPesos(resumen.totalFacturado)}</strong>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Recibido en caja</span>
+        <strong class="stat-valor">${formatearPesos(resumen.dineroRecibidoTotal)}</strong>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Ganancia<span class="dato-interno"> (interno)</span></span>
+        <strong class="stat-valor">${formatearPesos(resumen.gananciaTotal)}</strong>
+      </div>
+    </div>
+    <p class="reporte-detalle">Dinero recibido en ventas (efectivo/transferencia): <strong>${formatearPesos(resumen.dineroRecibidoVentas)}</strong></p>
+    <p class="reporte-detalle">Abonos recibidos (pagos de ventas a crédito): <strong>${formatearPesos(resumen.abonosRecibidos)}</strong></p>
+    ${notaAproximada ? `<p class="reporte-detalle">${notaAproximada}</p>` : ''}
     <p><strong>Desglose por método de pago:</strong></p>
     <ul>${filasMetodo || '<li class="empty-state">Sin ventas en este rango.</li>'}</ul>
   `;
@@ -1873,14 +2216,15 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
     }
 
     if (data.productos.length === 0) {
-      tablaRanking.innerHTML = '<tr><td colspan="3" class="empty-state">No hay ventas registradas en este rango.</td></tr>';
+      tablaRanking.innerHTML = '<tr><td colspan="4" class="empty-state">No hay ventas registradas en este rango.</td></tr>';
       return;
     }
 
     tablaRanking.innerHTML = data.productos
       .map(
-        (p) => `
+        (p, indice) => `
         <tr>
+          <td><strong>${indice + 1}</strong></td>
           <td>${escaparHtml(p.nombre)}</td>
           <td>${p.unidades_vendidas}</td>
           <td>${formatearPesos(p.ingreso_generado)}</td>
@@ -1895,8 +2239,46 @@ document.getElementById('btn-ranking').addEventListener('click', async () => {
 
 // --- Registro de auditoría (solo lectura) ---
 
-// Popula el <select> de acciones con el catálogo real que expone el backend,
-// para no duplicar a mano la lista de códigos de acción en el frontend.
+// El backend guarda y filtra por códigos internos ("producto_creado"), pero
+// nadie no técnico debería ver eso en pantalla — se traduce acá, en los dos
+// únicos lugares donde se muestran: las opciones del filtro y la columna
+// "Acción" de la tabla. Si el backend agrega una acción nueva que todavía
+// no tiene traducción, se muestra el código tal cual en vez de romper nada.
+const ETIQUETA_ACCION = {
+  login_exitoso: 'Inicio de sesión',
+  login_fallido: 'Intento de inicio de sesión fallido',
+  logout: 'Cierre de sesión',
+  venta_creada: 'Venta registrada',
+  abono_registrado: 'Pago registrado',
+  producto_creado: 'Producto agregado',
+  producto_actualizado: 'Producto editado',
+  producto_desactivado: 'Producto desactivado',
+  producto_reactivado: 'Producto reactivado',
+  producto_eliminado: 'Producto eliminado',
+  stock_ingresado: 'Ingreso de mercancía',
+  cliente_creado: 'Cliente agregado',
+  cliente_actualizado: 'Cliente editado',
+  cliente_desactivado: 'Cliente desactivado',
+  cliente_reactivado: 'Cliente reactivado',
+  cliente_eliminado: 'Cliente eliminado',
+  configuracion_actualizada: 'Configuración del negocio editada',
+  recuperacion_solicitada: 'Recuperación de contraseña solicitada',
+  recuperacion_completada: 'Contraseña restablecida',
+  factura_enviada_correo: 'Factura enviada por correo',
+};
+
+const ETIQUETA_ENTIDAD = {
+  venta: 'Factura',
+  usuario: 'Usuario',
+  cliente: 'Cliente',
+  producto: 'Producto',
+  configuracion_empresa: 'Configuración del negocio',
+};
+
+// Popula el <select> de acciones con el catálogo real que expone el
+// backend (para no duplicar a mano la lista de códigos posibles), mostrando
+// la etiqueta legible mientras el valor real que viaja en la consulta sigue
+// siendo el código interno.
 async function cargarAccionesAuditoria() {
   const selectAccion = document.getElementById('auditoria-accion');
   if (selectAccion.dataset.cargado === 'true') return;
@@ -1909,7 +2291,7 @@ async function cargarAccionesAuditoria() {
     data.acciones.forEach((accion) => {
       const opcion = document.createElement('option');
       opcion.value = accion;
-      opcion.textContent = accion;
+      opcion.textContent = ETIQUETA_ACCION[accion] || accion;
       selectAccion.appendChild(opcion);
     });
     selectAccion.dataset.cargado = 'true';
@@ -1928,11 +2310,13 @@ async function cargarAuditoria() {
   const desde = document.getElementById('auditoria-desde').value;
   const hasta = document.getElementById('auditoria-hasta').value;
   const accion = document.getElementById('auditoria-accion').value;
+  const usuario = document.getElementById('auditoria-usuario').value.trim();
 
   const parametros = new URLSearchParams();
   if (desde) parametros.set('desde', desde);
   if (hasta) parametros.set('hasta', hasta);
   if (accion) parametros.set('accion', accion);
+  if (usuario) parametros.set('usuario', usuario);
   const query = parametros.toString() ? `?${parametros.toString()}` : '';
 
   tablaAuditoria.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
@@ -1958,8 +2342,8 @@ async function cargarAuditoria() {
         <tr>
           <td>${formatearFecha(evento.creado_en)}</td>
           <td>${escaparHtml(evento.usuario)}</td>
-          <td>${escaparHtml(evento.accion)}</td>
-          <td>${escaparHtml(evento.entidad)}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
+          <td>${escaparHtml(ETIQUETA_ACCION[evento.accion] || evento.accion)}</td>
+          <td>${escaparHtml(ETIQUETA_ENTIDAD[evento.entidad] || evento.entidad)}${evento.entidad_id ? ` #${evento.entidad_id}` : ''}</td>
           <td>${escaparHtml(evento.detalle)}</td>
           <td>${escaparHtml(evento.ip)}</td>
         </tr>

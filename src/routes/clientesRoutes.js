@@ -9,6 +9,7 @@ const ESTADO_POR_ERROR = {
   correo_invalido: 400,
   documento_duplicado: 409,
   no_encontrado: 404,
+  no_se_puede_eliminar: 409,
 };
 
 function responderError(res, resultado) {
@@ -83,6 +84,31 @@ router.delete('/clientes/:id', (req, res) => {
   const resultado = clientesService.desactivarCliente(id, req.usuario);
   if (!resultado.exito) return responderError(res, resultado);
   return res.json({ exito: true, cliente: resultado.cliente });
+});
+
+router.patch('/clientes/:id/reactivar', (req, res) => {
+  const id = parsearId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ exito: false, mensaje: 'El id del cliente debe ser un número entero.' });
+  }
+
+  const resultado = clientesService.reactivarCliente(id, req.usuario);
+  if (!resultado.exito) return responderError(res, resultado);
+  return res.json({ exito: true, cliente: resultado.cliente });
+});
+
+// Borrado permanente (distinto del DELETE de arriba, que solo desactiva):
+// ruta propia para no cambiarle el significado a un endpoint que ya está en
+// uso por el frontend actual.
+router.delete('/clientes/:id/permanente', (req, res) => {
+  const id = parsearId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ exito: false, mensaje: 'El id del cliente debe ser un número entero.' });
+  }
+
+  const resultado = clientesService.eliminarCliente(id, req.usuario);
+  if (!resultado.exito) return responderError(res, resultado);
+  return res.json({ exito: true });
 });
 
 module.exports = router;

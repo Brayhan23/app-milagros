@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const ventasService = require('./ventasService');
 const configuracionRepo = require('../data/configuracionRepo');
 const auditoriaService = require('./auditoriaService');
+const { formatearFechaColombia } = require('./fechaColombia');
 const { ACCIONES } = auditoriaService;
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,7 +68,7 @@ function construirHtmlFactura(venta) {
       <h2 style="color:#c2185b; margin-bottom:0;">${nombreEmpresa}</h2>
       ${lineaEmpresa ? `<p style="margin:2px 0; color:#767676; font-size:0.85em;">${lineaEmpresa}</p>` : ''}
       <p style="margin-top:2px; color:#767676;">Comprobante de venta</p>
-      <p>Factura N.° <strong>${venta.id}</strong> — ${venta.creado_en}</p>
+      <p>Factura N.° <strong>${venta.id}</strong> — ${formatearFechaColombia(venta.creado_en)}</p>
       <table style="width:100%; border-collapse:collapse; margin-top:12px;">
         <thead>
           <tr style="background:#fce4ec; color:#c2185b;">
