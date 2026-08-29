@@ -8,7 +8,7 @@
     "crear-admin": "node scripts/crear-admin.js",
     "configurar-correo": "node scripts/configurar-correo.js",
     "verificar-backup": "node scripts/verificar-backup.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test --test-reporter=spec --test-reporter-destination=stdout \"test/*.test.js\""
   },
   "keywords": [],
   "author": "",

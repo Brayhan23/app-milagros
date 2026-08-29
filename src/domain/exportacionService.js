@@ -355,4 +355,12 @@ async function generarPdfRango(desde, hasta) {
   return { exito: true, buffer, nombreArchivo: nombreArchivo(desde, hasta, 'pdf'), contentType: MIME_PDF };
 }
 
-module.exports = { generarExcelRango, generarPdfRango };
+module.exports = {
+  generarExcelRango,
+  generarPdfRango,
+  // Exportado únicamente para pruebas automatizadas: permite verificar por
+  // código que el objeto que alimenta tanto al Excel como al PDF nunca trae
+  // gananciaTotal/gananciaAproximada (allow-list explícita más arriba en
+  // este archivo), sin depender de parsear el binario de un PDF generado.
+  obtenerDatosReporte,
+};
