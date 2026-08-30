@@ -659,18 +659,268 @@ a {
   margin: 2px 0;
 }
 
+/* --- Impresión térmica (Jaltech POS-80, papel de 80mm) --------------------
+   Una térmica no imprime tinta: quema el papel. Solo hay dos estados
+   (quemado / no quemado) — cualquier gris o color de marca se renderiza
+   como un punteado disperso, casi ilegible. Por eso esta hoja de impresión
+   no reutiliza los colores de pantalla: los redefine a blanco y negro
+   puros, solo para el papel.
+
+   Todo lo de acá abajo vive DENTRO de @media print y, salvo @page (que no
+   se puede acotar a un selector, es una regla de página), está además
+   acotado a .card.factura — así ninguna otra pantalla de la app cambia de
+   aspecto al imprimir, solo la factura. Hoy btn-imprimir-factura es el
+   único botón de imprimir de toda la app, así que @page (tamaño de papel)
+   puede ser global sin riesgo de pisar ninguna otra pantalla. */
 @media print {
   .no-print,
   .header,
   .tabs {
     display: none !important;
   }
+
+  @page {
+    /* 80mm es el ancho del rollo. El área imprimible real de una POS-80 es
+       ~72mm (el resto es margen físico de la propia impresora) — 4mm de
+       margen a cada lado deja exactamente esos 72mm de contenido.
+       Margen superior/inferior en 0: el papel es un rollo continuo, no
+       hace falta reservar espacio de página fija, y dejarlo en 0 es
+       también lo que más ayuda a que Chrome no tenga dónde dibujar su
+       encabezado/pie (fecha, URL, título) — igual hace falta desmarcar
+       "Encabezados y pies de página" en el diálogo de impresión, eso no
+       se puede forzar solo con CSS (ver docs/impresion-termica.md). */
+    size: 80mm auto;
+    margin: 0 4mm;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  .container {
+    max-width: 72mm;
+    padding: 0;
+    margin: 0;
+  }
+
   .card.factura {
+    /* Redefine acá las variables de color de marca: como son variables
+       CSS, cualquier regla de este archivo que ya use var(--rosa),
+       var(--texto-suave), var(--lila), var(--borde), etc. dentro de la
+       factura hereda este blanco-y-negro automáticamente — badges,
+       encabezado de tabla, "Comprobante de venta", la nota de IVA
+       aproximado — sin tener que perseguir cada selector uno por uno. */
+    --rosa: #000000;
+    --rosa-oscuro: #000000;
+    --rosa-claro: #ffffff;
+    --lila: #ffffff;
+    --verde-menta: #ffffff;
+    --texto: #000000;
+    --texto-suave: #000000;
+    --borde: #000000;
+    --exito: #000000;
+    --exito-fondo: #ffffff;
+    --alerta: #000000;
+    --alerta-fondo: #ffffff;
+    --error: #000000;
+    --error-fondo: #ffffff;
+    /* Sans-serif de trazo grueso, sin condensar, ya instalada en Windows —
+       sin fuentes por CDN, la app debe seguir funcionando sin internet. */
+    --fuente: Arial, "Segoe UI", sans-serif;
+
     box-shadow: none;
     border: none;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    font-family: var(--fuente);
   }
-  body {
-    background: #fff;
+
+  /* Red de seguridad: "todo el texto en negro, sin excepción" y "elimina
+     cualquier opacity en textos", garantizado aunque algún selector se
+     escape de las variables de arriba. Los pesos mínimos (500 general, 600
+     para lo importante) se ponen después, más específicos, así que ganan
+     sobre esta base. */
+  .card.factura,
+  .card.factura * {
+    color: #000000 !important;
+    opacity: 1 !important;
+    font-weight: 500;
+  }
+
+  /* --- Encabezado: apilado y centrado, no en dos columnas ---
+     En pantalla, .factura-header es un flex de dos columnas (datos de la
+     empresa a la izquierda, N.° y fecha a la derecha) — funciona en una
+     pantalla ancha, pero en 72mm comprime tanto el nombre de la empresa
+     que se parte en dos o tres líneas. Apilado y centrado le da TODO el
+     ancho disponible al nombre. */
+  .card.factura .factura-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  /* Logo actual: rosa con degradado suave — una térmica de un solo color
+     (quemado/no quemado) convierte cualquier degradado en un punteado
+     gris apenas visible. El nombre de la empresa en texto grande y bien
+     negro identifica el negocio igual de bien, y ese sí rinde perfecto. */
+  .card.factura .factura-logo {
+    display: none !important;
+  }
+
+  .card.factura #factura-empresa-nombre {
+    /* 15px, no más grande: a 72mm de ancho, un nombre de empresa típico
+       (ej. "Cosmeticos Milagros SAS", 23 caracteres) en negrita todavía
+       parte a dos líneas por encima de este tamaño — verificado imprimiendo
+       de verdad. Sigue siendo, por lejos, el texto más grande del
+       encabezado (compará con los 11-12px del resto). */
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 0;
+    line-height: 1.25;
+  }
+  .card.factura .factura-header .empty-state {
+    font-size: 11px;
+  }
+  .card.factura .factura-meta {
+    text-align: center;
+    font-size: 12px;
+  }
+  .card.factura .factura-meta p {
+    margin: 1px 0;
+  }
+  .card.factura #factura-id {
+    font-weight: 700;
+  }
+
+  /* --- Tabla de productos: compacta pero legible ---
+     Ancho fijo por columna (table-layout: fixed) en vez de dejar que el
+     navegador reparta el ancho según el contenido: sin esto, "Precio
+     Unit." y "Subtotal" (números cortos) le robaban ancho al nombre del
+     producto, que es lo más largo y lo que más se beneficia de espacio. */
+  .card.factura table.tabla-inventario {
+    font-size: 12px;
+    table-layout: fixed;
+  }
+  .card.factura .tabla-inventario th:nth-child(1),
+  .card.factura .tabla-inventario td:nth-child(1) {
+    /* El nombre del producto cede espacio a propósito: ya se parte en
+       varias líneas de todas formas con nombres largos, así que no pasa
+       nada si tiene menos ancho — a diferencia de las otras tres columnas,
+       que si se parten se ven mal (una palabra sola, o un monto cortado). */
+    width: 40%;
+  }
+  .card.factura .tabla-inventario th:nth-child(2),
+  .card.factura .tabla-inventario td:nth-child(2) {
+    /* Cantidad: el dato real son 1-2 dígitos, no necesita casi nada — se
+       la achica a propósito para separarla de "Precio" y que no se vea
+       amontonada contra esa columna. overflow-wrap: anywhere en vez de
+       dejarla desbordar: así, si el encabezado no entra entero, se
+       contiene partiéndose dentro de su propia columna en vez de invadir
+       la de al lado. */
+    width: 16%;
+    overflow-wrap: anywhere;
+  }
+  .card.factura .tabla-inventario th:nth-child(3),
+  .card.factura .tabla-inventario td:nth-child(3) {
+    width: 24%; /* "$25.000" no debe partirse nunca */
+  }
+  .card.factura .tabla-inventario th:nth-child(4),
+  .card.factura .tabla-inventario td:nth-child(4) {
+    width: 20%;
+  }
+  .card.factura .tabla-inventario th,
+  .card.factura .tabla-inventario td {
+    padding: 4px 2px;
+    border-bottom: 1px solid #000000;
+  }
+  /* "Precio Unit." se acorta a "Precio" a secas en la impresión: en un
+     recibo se entiende igual, y así entra en una sola línea en vez de
+     partirse en dos ("Precio" / "Unit."). No toca el texto en pantalla —
+     el span solo se oculta acá, dentro de @media print. */
+  .card.factura .factura-th-unit {
+    display: none;
+  }
+  /* "Cantidad" se acorta a "Cant" con el mismo mecanismo: el HTML ya trae
+     "Cant" + un span con "idad" que solo se oculta acá — se ve "CANT" por
+     el text-transform: uppercase del th, sin punto. No toca la pantalla:
+     el span solo se oculta dentro de @media print. */
+  .card.factura .factura-th-cantidad-resto {
+    display: none;
+  }
+  /* white-space: nowrap SOLO en los montos: "$25.000" partido a la mitad
+     por falta de ancho es mucho peor que dejarlo desbordar unos px — con
+     los anchos de columna de arriba no debería hacer falta desbordar, pero
+     esto es la garantía de que un monto nunca se corte a la mitad. */
+  .card.factura .tabla-inventario td:nth-child(3),
+  .card.factura .tabla-inventario td:nth-child(4) {
+    white-space: nowrap;
+  }
+  .card.factura .tabla-inventario th {
+    border-bottom: 2px solid #000000;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: normal; /* cada mm cuenta a 72mm de ancho */
+  }
+  .card.factura .tabla-inventario td:first-child {
+    font-weight: 600; /* nombre del producto */
+  }
+
+  /* --- Totales: el TOTAL es lo más visible de todo el papel ---
+     display:flex + order reordena estas líneas SOLO en la impresión (son
+     puro CSS, no tocan el HTML ni el orden en pantalla): el detalle de IVA
+     pasa a mostrarse ANTES del total en vez de después, así el total queda
+     como el verdadero cierre — la última línea que se lee en todo el
+     papel, justo antes de que se corte. */
+  .card.factura .resumen-totales {
+    display: flex;
+    flex-direction: column;
+    border-top: 2px solid #000000;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+  .card.factura .resumen-totales p {
+    font-size: 12px;
+  }
+  .card.factura .resumen-totales p.factura-iva-detalle {
+    order: 1;
+  }
+  .card.factura .resumen-totales p.total-final {
+    order: 2;
+  }
+  .card.factura .resumen-totales strong {
+    font-weight: 700;
+  }
+  .card.factura .resumen-totales .total-final {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 24px;
+    font-weight: 800;
+    border: 2px solid #000000;
+    padding: 6px 10px;
+    margin: 10px 0;
+  }
+  .card.factura .resumen-totales .total-final strong {
+    font-size: 26px;
+    font-weight: 800;
+  }
+  .card.factura .dato-interno {
+    font-size: 11px;
+  }
+
+  /* Badges (tipo de cliente, método de pago): sin relleno de color —
+     contorno negro para que se sigan viendo como una etiqueta. */
+  .card.factura .badge {
+    border: 1px solid #000000;
+    font-weight: 700;
+    background: #ffffff;
   }
 }
 
