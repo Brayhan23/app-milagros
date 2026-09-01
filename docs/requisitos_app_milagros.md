@@ -217,7 +217,8 @@ Files. Estructura propuesta:
 C:\AppMilagros\                    (carpeta de instalación, elegida al instalar)
 ├── app-milagros.exe               ← se REEMPLAZA en cada actualización
 ├── better_sqlite3.node            ← addon nativo, junto al exe (ver más abajo)
-├── bcrypt.node                    ← addon nativo, junto al exe
+├── prebuilds\win32-x64\
+│   └── bcrypt.node                ← addon nativo, junto al exe (ver más abajo)
 ├── .env                           ← configuración local — NUNCA se toca al actualizar
 ├── iniciar.bat                    ← lanzador para el inicio automático (ver punto 4)
 ├── data\
@@ -233,6 +234,11 @@ C:\Users\<usuario>\Google Drive\MilagrosBackups\   ← BACKUP_PATH, fuera de C:\
 ├── milagros-2026-08-02.db
 └── ...
 ```
+
+(Todo esto lo genera `npm run build` en `dist\` — ver "Hallazgos..." abajo para
+el detalle de por qué `bcrypt.node` queda en una subcarpeta `prebuilds\win32-x64\`
+en vez de junto al .exe como `better_sqlite3.node`, y `docs/instalacion.md`
+para el procedimiento de instalación paso a paso.)
 
 Reglas de esta estructura:
 - **`data\` y `logs\` van AL LADO del ejecutable, no dentro de ninguna carpeta
@@ -270,37 +276,54 @@ configure el empaquetado, eran conceptualmente incorrectas de todas formas):
   con un mensaje claro que dice explícitamente que revisar los assets del
   paquete si esto corre empaquetado.
 
-Hallazgos que **quedan pendientes para la propia tarea de empaquetado** (no
-se tocan ahora, tal como se pidió):
+Hallazgos, ya **resueltos** como parte del propio trabajo de empaquetado
+(2026-08-29):
 
-- 🔴 **Los dos addons nativos (`better-sqlite3`, `bcrypt`) son archivos
+- ✅ **Los dos addons nativos (`better-sqlite3`, `bcrypt`) son archivos
   `.node` compilados** — `pkg` NO puede meterlos dentro del snapshot de
-  JavaScript. Tienen que copiarse sueltos junto al `.exe` y cargarse desde
-  ahí explícitamente. Es el punto de mayor riesgo de todo el empaquetado:
-  si se hace mal, la app ni siquiera arranca. Además, el addon compilado
-  tiene que coincidir con la versión de Node que `pkg` empaqueta (por eso
-  conviene fijar el target de `pkg` a Node 22, coherente con el `.nvmrc` ya
-  agregado).
-- 🔴 **`pkg` (`vercel/pkg`) está sin mantenimiento desde 2023.** Usar el
-  fork mantenido por la comunidad, `@yao-pkg/pkg`, en vez del paquete
-  original.
-- 🟡 **`pdfkit` lee archivos de fuente (`.afm`) desde disco en tiempo de
-  ejecución** (`node_modules/pdfkit/js/data/Helvetica*.afm`, entre otros) —
-  exactamente las fuentes que usa `exportacionService.js`. Hay que
-  declararlos explícitamente como assets del paquete (`pkg.assets` en
-  `package.json`), no confiar solo en la detección automática de `pkg`.
-- 🟡 **`schema.sql` y todo `src/public/**` (frontend) también necesitan
-  declararse como assets explícitos** en `package.json` — son código/datos
-  de solo lectura que sí deben viajar dentro del snapshot (a diferencia de
-  `data/`/`logs/`), pero `pkg` necesita que se le diga cuáles son.
-- 🔴 **Conflicto real de diseño: `src/public/uploads/` mezcla código
-  (servido como asset de solo lectura) con datos de la usuaria (el logo,
-  que hoy se coloca ahí a mano).** Una vez empaquetado, esa carpeta deja de
-  ser un directorio real en disco — es parte del snapshot. Hay que separar
-  el logo a una carpeta propia fuera del snapshot (ej. `uploads\` al lado
-  del `.exe`, como en la estructura de arriba) y servirla con su propia
-  ruta estática apuntando a `process.cwd()`, no a `__dirname`. Esto se
-  resuelve como parte del propio trabajo de empaquetado.
+  JavaScript, así que se cargan explícitamente desde afuera, cada uno con
+  su propio mecanismo (ninguno quedó librado a la detección automática de
+  `pkg`, que para estos dos casos específicos no funciona: son
+  `require()` calculados en tiempo de ejecución, no un string literal):
+  - `better-sqlite3` acepta oficialmente una ruta explícita vía la opción
+    `nativeBinding` de su constructor — `src/data/db.js` la usa apuntando a
+    `better_sqlite3.node` junto al `.exe` cuando `process.pkg` existe (en
+    desarrollo, sin `process.pkg`, sigue igual que siempre).
+  - `bcrypt` no tiene un equivalente a `nativeBinding`, pero el cargador
+    que usa por debajo (`node-gyp-build`) ya busca, sin código nuestro de
+    por medio, en `prebuilds/<plataforma>-<arquitectura>/` junto al
+    ejecutable que lo está corriendo — alcanza con reproducir esa misma
+    carpeta (`prebuilds\win32-x64\bcrypt.node`) junto al `.exe`.
+  - Ambos verificados end-to-end en un `.exe` real generado con
+    `npm run build`, corriendo en esta misma máquina Windows: login (usa
+    bcrypt) y todas las operaciones de base de datos (better-sqlite3)
+    funcionan.
+- ✅ **`pkg` (`vercel/pkg`) está sin mantenimiento desde 2023.** Se usó el
+  fork mantenido por la comunidad, `@yao-pkg/pkg`, no el paquete original
+  (`devDependencies` en `package.json`).
+- ✅ **`pdfkit` lee archivos de fuente (`.afm`) desde disco en tiempo de
+  ejecución** — declarados como asset (`node_modules/pdfkit/js/data/*.afm`
+  en `pkg.assets`, `package.json`). Verificado generando un PDF real desde
+  el `.exe` empaquetado.
+- ✅ **`schema.sql` y todo `src/public/**` (frontend) también necesitan
+  declararse como assets explícitos** — agregados a `pkg.assets`.
+  Verificado: el `.exe` crea la base de datos con el esquema completo en el
+  primer arranque y sirve el frontend completo.
+- ✅ **Conflicto real de diseño: `src/public/uploads/` mezclaba código con
+  datos de la usuaria.** El logo se movió a una carpeta `uploads/` propia,
+  fuera de `src/public` (en desarrollo, en la raíz del proyecto; en el PC
+  del cliente, junto al `.exe`), servida en `server.js` con su propia ruta
+  estática apuntando a `process.cwd()`, no a `__dirname`. `src/public/`
+  quedó libre de datos de la usuaria — todo lo que hay ahí es código.
+
+Un detalle adicional que apareció al construir el `.exe` (no estaba en la
+lista original): `pdfkit` usa por debajo la librería `fontkit`, que a su vez
+trae `brotli` para soportar fuentes WOFF2 — código que `pkg` no logra
+precompilar a bytecode V8. Esta app nunca carga fuentes externas (solo las
+14 estándar por nombre, ej. `Helvetica`), así que ese camino nunca se
+ejecuta, pero por las dudas se armó el `.exe` con `--fallback-to-source`
+(ver `scripts/build.js`) para que ese archivo puntual viaje igual como texto
+plano en vez de quedar afuera del paquete.
 
 ### Inicio automático con Windows
 
@@ -366,13 +389,17 @@ tocar la carpeta de inicio de Windows cada vez.
 - [ ] Configurar SMTP con la cuenta de correo real del negocio (no la cuenta de pruebas del desarrollador)
 
 **Empaquetado (ver "Empaquetado y despliegue" arriba para el detalle de cada punto)**
-- [ ] Empaquetar la app con `@yao-pkg/pkg` (no `vercel/pkg`, sin mantenimiento), target Node 22
-- [ ] Copiar los addons nativos (`better-sqlite3`, `bcrypt`) sueltos junto al `.exe` y confirmar que cargan
-- [ ] Declarar `schema.sql`, `src/public/**` y las fuentes `.afm` de `pdfkit` como assets explícitos en `pkg.assets`
-- [ ] Resolver el conflicto de `src/public/uploads/` (separar el logo a una carpeta propia fuera del snapshot)
-- [ ] Verificar que el `.exe` empaquetado sigue funcionando en localhost solamente (repetir la prueba de la pasada 1 de auditoría: alcanzable desde el propio PC, NO alcanzable desde otro dispositivo en la misma red) — el binding a 127.0.0.1 es código, no depende del empaquetado, pero vale la pena confirmarlo corriendo desde el .exe real y no solo con `node server.js`
-- [ ] No requiere instalar Node.js en el PC del cliente (pkg empaqueta su propio runtime) — sí verificar que la versión de Windows del PC del cliente sea compatible con el target elegido
+- [x] Empaquetar la app con `@yao-pkg/pkg` (no `vercel/pkg`, sin mantenimiento), target Node 22 — `npm run build` (`scripts/build.js`)
+- [x] Copiar los addons nativos (`better-sqlite3`, `bcrypt`) sueltos junto al `.exe` y confirmar que cargan — confirmado corriendo el `.exe` real en esta máquina (login, que usa bcrypt, y todas las operaciones de base de datos, que usan better-sqlite3, funcionaron)
+- [x] Declarar `schema.sql`, `src/public/**` y las fuentes `.afm` de `pdfkit` como assets explícitos en `pkg.assets` — confirmado: el `.exe` crea la BD con el esquema completo, sirve el frontend y genera un PDF real
+- [x] Resolver el conflicto de `src/public/uploads/` (separar el logo a una carpeta propia fuera del snapshot) — logo movido a `uploads/` (raíz del proyecto en desarrollo, junto al `.exe` en el cliente), servida aparte en `server.js`
+- [x] Verificar que el `.exe` empaquetado escucha solo en `127.0.0.1` — confirmado con `netstat` corriendo el `.exe` real (`127.0.0.1:PUERTO ... LISTENING`, no `0.0.0.0`)
+- [ ] Repetir la prueba de la pasada 1 de auditoría **desde un segundo dispositivo físico** en la misma red (celular, otro PC) contra el `.exe` corriendo en el PC del cliente — no se pudo hacer desde este entorno de desarrollo, que no tiene un segundo dispositivo a mano
+- [ ] Confirmar en el PC real del cliente que no hace falta instalar Node.js — verificado aquí que el `.exe` no depende del Node del sistema en cuanto al runtime empaquetado (trae el suyo propio, target `node22-win-x64`), pero esta máquina de desarrollo sí tiene Node instalado; falta la confirmación en una máquina limpia real
 
 **Inicio automático**
-- [ ] Crear `iniciar.bat` (ver contenido propuesto arriba) y colocar un acceso directo en `shell:startup`
+- [x] Crear `iniciar.bat` (ver contenido propuesto arriba) — listo en la raíz del proyecto y se copia solo a `dist\` con `npm run build`; falta colocar el acceso directo en `shell:startup` en el PC real del cliente (paso 5 de `docs/instalacion.md`)
 - [ ] Probar reinicio completo del PC del cliente y confirmar que la app arranca sola, sin ventana de consola molesta, con los datos correctos
+
+Procedimiento de instalación completo, paso a paso, pensado para seguirse
+en el momento de instalar: `docs/instalacion.md`.

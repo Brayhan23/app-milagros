@@ -1,13 +1,16 @@
-// Uso: node scripts/configurar-correo.js <usuario> <correo>
+// Uso en desarrollo:  node scripts/configurar-correo.js <usuario> <correo>
+// Uso empaquetado:    app-milagros.exe configurar-correo <usuario> <correo>
 const usuariosRepo = require('../src/data/usuariosRepo');
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function main() {
-  const [usuario, correo] = process.argv.slice(2);
+function main(args) {
+  const [usuario, correo] = args;
 
   if (!usuario || !correo) {
-    console.error('Uso: node scripts/configurar-correo.js <usuario> <correo>');
+    console.error('Uso:');
+    console.error('  app-milagros.exe configurar-correo <usuario> <correo>   (PC del cliente)');
+    console.error('  node scripts/configurar-correo.js <usuario> <correo>    (desarrollo)');
     process.exit(1);
   }
 
@@ -24,6 +27,11 @@ function main() {
 
   const actualizado = usuariosRepo.actualizarCorreo(registro.id, correo);
   console.log(`Correo actualizado: usuario=${actualizado.usuario}, correo=${actualizado.correo}`);
+  process.exit(0);
 }
 
-main();
+module.exports = main;
+
+if (require.main === module) {
+  main(process.argv.slice(2));
+}

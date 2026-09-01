@@ -1,5 +1,10 @@
-// Uso: node scripts/verificar-backup.js [ruta-al-backup.db]
+// Uso en desarrollo:  node scripts/verificar-backup.js [ruta-al-backup.db]
+// Uso empaquetado:    app-milagros.exe verificar-backup [ruta-al-backup.db]
 // Sin argumento, verifica el respaldo más reciente en BACKUP_PATH.
+//
+// require('dotenv').config() es idempotente (dotenv no pisa variables que ya
+// existan en process.env), así que llamarlo de nuevo acá no hace nada raro
+// cuando este módulo se invoca desde server.js, que ya lo hizo antes.
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -15,8 +20,8 @@ function backupMasReciente(carpeta) {
   return archivos[0] ? path.join(carpeta, archivos[0]) : null;
 }
 
-function main() {
-  const rutaArg = process.argv[2];
+function main(args) {
+  const rutaArg = args[0];
   const ruta = rutaArg || (process.env.BACKUP_PATH && backupMasReciente(process.env.BACKUP_PATH));
 
   if (!ruta || !fs.existsSync(ruta)) {
@@ -59,4 +64,8 @@ function main() {
   process.exit(codigoSalida);
 }
 
-main();
+module.exports = main;
+
+if (require.main === module) {
+  main(process.argv.slice(2));
+}

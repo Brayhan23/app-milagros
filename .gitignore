@@ -151,6 +151,11 @@ vite.config.ts.timestamp-*
 /data/
 /backups-local/
 
-# HU-18: logos que suba cada instalación (contenido de runtime, no de código)
-/src/public/uploads/*
-!/src/public/uploads/.gitkeep
+# HU-18: logo de cada instalación (dato de la usuaria, no código). Vive junto
+# al ejecutable/proceso (process.cwd()), no dentro de src/public, para que
+# sobreviva a un empaquetado con pkg (ver docs/requisitos_app_milagros.md,
+# sección "Empaquetado y despliegue").
+/uploads/
+
+# Empaquetado: salida de "npm run build" (el .exe y sus archivos de apoyo)
+/dist/

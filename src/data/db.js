@@ -8,7 +8,18 @@ const dbExistia = fs.existsSync(dbPath);
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const db = new Database(dbPath);
+// better-sqlite3 localiza su addon nativo (.node) por su cuenta vía el
+// paquete "bindings", que busca en rutas relativas a node_modules — dentro de
+// un ejecutable empaquetado (pkg) esas rutas caen dentro del snapshot de solo
+// lectura del binario, donde no hay un archivo .node real que se pueda
+// dlopen(). La propia librería expone una salida oficial para esto: la
+// opción "nativeBinding" acepta una ruta absoluta y la usa en vez de
+// "bindings". Se apunta al .node que "npm run build" deja suelto junto al
+// .exe (ver scripts/build.js) — process.pkg solo existe corriendo empaquetado,
+// así que en desarrollo esto no cambia nada.
+const nativeBindingPath = process.pkg ? path.join(path.dirname(process.execPath), 'better_sqlite3.node') : undefined;
+
+const db = new Database(dbPath, nativeBindingPath ? { nativeBinding: nativeBindingPath } : undefined);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

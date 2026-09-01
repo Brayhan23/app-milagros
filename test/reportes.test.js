@@ -75,7 +75,12 @@ describe('Zona horaria (Colombia = UTC-5)', () => {
 describe('Los totales del reporte coinciden con la suma real de las ventas', () => {
   test('el total facturado del rango es exactamente la suma de las ventas creadas en ese rango', () => {
     const producto = crearProductoDePrueba({ precioDetal: 10000, stockActual: 100 });
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Colombia, no UTC: reportesRepo clasifica cada venta por su fecha en
+    // Colombia (date(creado_en, '-5 hours')), así que "hoy" tiene que usar el
+    // mismo criterio — si no, esta prueba falla ella sola entre las 00:00 y
+    // las 04:59 UTC (7pm-11:59pm en Colombia), cuando el día calendario en
+    // Colombia todavía no alcanzó al de UTC.
+    const hoy = fechaColombia.fechaColombiaISO(new Date().toISOString());
 
     // Instantánea ANTES de crear nada: este archivo comparte una sola base
     // de datos temporal entre todas sus pruebas, así que "hoy" puede ya
@@ -105,7 +110,8 @@ describe('Los totales del reporte coinciden con la suma real de las ventas', () 
 describe('Ganancia contra el costo histórico', () => {
   test('si el precio de compra del producto cambia DESPUÉS de la venta, la ganancia reportada sigue usando el costo de cuando se vendió', () => {
     const producto = crearProductoDePrueba({ precioCompra: 5000, precioDetal: 12000, stockActual: 10 });
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Mismo motivo que en la prueba anterior: "hoy" en Colombia, no en UTC.
+    const hoy = fechaColombia.fechaColombiaISO(new Date().toISOString());
 
     const antes = reportesService.historicoPorRango(hoy, hoy);
     assert.equal(antes.exito, true);
